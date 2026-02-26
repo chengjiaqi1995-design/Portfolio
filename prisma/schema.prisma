@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ============ 分类管理 (Taxonomy) ============
+
+model Taxonomy {
+  id        Int      @id @default(autoincrement())
+  type      String   // "topdown" | "sector" | "theme"
+  name      String
+  parentId  Int?
+  parent    Taxonomy?  @relation("TaxonomyTree", fields: [parentId], references: [id])
+  children  Taxonomy[] @relation("TaxonomyTree")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  positionsAsTheme   Position[] @relation("PositionTheme")
+  positionsAsSector  Position[] @relation("PositionSector")
+  positionsAsTopdown Position[] @relation("PositionTopdown")
+
+  @@unique([type, name])
+}
+
+// ============ 名称映射 ============
+
+model NameMapping {
+  id          Int      @id @default(autoincrement())
+  bbgName     String   @unique
+  chineseName String
+  positionId  Int?
+  position    Position? @relation(fields: [positionId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============ 个股持仓 ============
+
+model Position {
+  id              Int      @id @default(autoincrement())
+  tickerBbg       String   // Bloomberg ticker e.g. "669 HK Equity"
+  nameEn          String   // English name
+  nameCn          String   // Chinese name
+  market          String   // 中国/香港/美国/日本/韩国/德国/印度/台湾
+
+  // 分类引用
+  sectorId        Int?
+  sector          Taxonomy? @relation("PositionSector", fields: [sectorId], references: [id])
+  themeId         Int?
+  theme           Taxonomy? @relation("PositionTheme", fields: [themeId], references: [id])
+  topdownId       Int?
+  topdown         Taxonomy? @relation("PositionTopdown", fields: [topdownId], references: [id])
+
+  priority        String   @default("")  // "!!!" or ""
+  longShort       String   @default("/") // "long" | "short" | "/" (watchlist)
+
+  // 财务数据
+  marketCapLocal  Float    @default(0)   // 本币市值
+  marketCapRmb    Float    @default(0)   // RMB市值(亿)
+  profit2025      Float    @default(0)   // 2025利润RMB亿
+  pe2026          Float    @default(0)
+  pe2027          Float    @default(0)
+  priceTag        String   @default("")  // 股价标签
+
+  // 持仓数据
+  positionAmount  Float    @default(0)   // 持仓金额 (USD)
+  positionWeight  Float    @default(0)   // 持仓比例
+
+  marketCapDate   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  nameMappings    NameMapping[]
+  research        CompanyResearch?
+  tradeItems      TradeItem[]
+
+  @@unique([tickerBbg])
+}
+
+// ============ 公司研究 ============
+
+model CompanyResearch {
+  id              Int      @id @default(autoincrement())
+  positionId      Int      @unique
+  position        Position @relation(fields: [positionId], references: [id])
+
+  strategy        String   @default("") // 公司策略
+  tam             String   @default("") // 空间
+  competition     String   @default("") // 格局
+  valueProposition String  @default("") // 生意本质（产品价值）
+  longTermFactors String   @default("") // 改变长期价值的东西
+  outlook3to5y    String   @default("") // 3-5年以后的东西
+  businessQuality String   @default("") // 生意本质评估
+  trackingData    String   @default("") // 跟踪的数据
+  valuation       String   @default("") // Valuation
+
+  revenueDownstream String @default("") // 收入拆分-按下游
+  revenueProduct    String @default("") // 收入拆分-按产品
+  revenueCustomer   String @default("") // 收入拆分-按客户
+  profitSplit       String @default("") // 利润拆分
+  leverage          String @default("") // leverage
+  peerComparison    String @default("") // 同行差距
+  costStructure     String @default("") // 成本结构
+  equipment         String @default("") // 设备
+
+  notes           String   @default("") // 额外笔记
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============ 调仓交易 ============
+
+model Trade {
+  id          Int         @id @default(autoincrement())
+  status      String      @default("pending") // "pending" | "previewed" | "exported" | "executed" | "cancelled"
+  note        String      @default("")
+  createdAt   DateTime    @default(now())
+  executedAt  DateTime?
+
+  items       TradeItem[]
+  snapshot    Snapshot?
+}
+
+model TradeItem {
+  id              Int      @id @default(autoincrement())
+  tradeId         Int
+  trade           Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  tickerBbg       String
+  name            String
+  transactionType String   // "buy" | "sell"
+  gmvUsdK         Float    // GMV in USD thousands, -1 means "all"
+  unwind          Boolean  @default(false)
+  reason          String   @default("")
+
+  positionId      Int?
+  position        Position? @relation(fields: [positionId], references: [id])
+
+  createdAt       DateTime @default(now())
+}
+
+// ============ 持仓快照 ============
+
+model Snapshot {
+  id            Int      @id @default(autoincrement())
+  tradeId       Int?     @unique
+  trade         Trade?   @relation(fields: [tradeId], references: [id])
+  snapshotDate  DateTime @default(now())
+  positionsJson String   // JSON string of all positions at this point
+  summaryJson   String   @default("") // JSON string of summary metrics
+  note          String   @default("")
+}
+
+// ============ 导入历史 ============
+
+model ImportHistory {
+  id          Int      @id @default(autoincrement())
+  importType  String   // "positions" | "market_cap"
+  fileName    String
+  recordCount Int
+  newCount    Int      @default(0)
+  updatedCount Int     @default(0)
+  createdAt   DateTime @default(now())
+}

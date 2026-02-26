@@ -1,0 +1,500 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Loader2,
+  Upload,
+  FileSpreadsheet,
+  Check,
+  AlertCircle,
+} from "lucide-react";
+import { toast } from "sonner";
+
+interface ImportPreview {
+  totalRecords: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  unmatched: { bbgName: string; suggestedName: string }[];
+}
+
+interface ImportHistoryItem {
+  id: number;
+  importType: string;
+  fileName: string;
+  recordCount: number;
+  newCount: number;
+  updatedCount: number;
+  createdAt: string;
+}
+
+interface NameMappingEntry {
+  bbgName: string;
+  chineseName: string;
+}
+
+function DropZone({
+  title,
+  description,
+  onFile,
+  loading,
+  accepted,
+}: {
+  title: string;
+  description: string;
+  onFile: (file: File) => void;
+  loading: boolean;
+  accepted: boolean;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(true);
+  }
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+  }
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) onFile(file);
+  }
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) onFile(file);
+  }
+
+  return (
+    <div
+      className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors cursor-pointer ${
+        dragOver
+          ? "border-primary bg-primary/5"
+          : accepted
+          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/10"
+          : "border-muted-foreground/25 hover:border-muted-foreground/50"
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onClick={() => inputRef.current?.click()}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        accept=".xlsx,.xls,.csv"
+        onChange={handleInputChange}
+      />
+      {loading ? (
+        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+      ) : accepted ? (
+        <Check className="h-10 w-10 text-emerald-500" />
+      ) : (
+        <Upload className="h-10 w-10 text-muted-foreground" />
+      )}
+      <h3 className="mt-3 font-semibold">{title}</h3>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        拖拽文件到此处，或点击上传
+      </p>
+    </div>
+  );
+}
+
+export default function ImportPage() {
+  const [positionPreview, setPositionPreview] = useState<ImportPreview | null>(
+    null
+  );
+  const [marketCapPreview, setMarketCapPreview] =
+    useState<ImportPreview | null>(null);
+  const [positionLoading, setPositionLoading] = useState(false);
+  const [marketCapLoading, setMarketCapLoading] = useState(false);
+  const [positionAccepted, setPositionAccepted] = useState(false);
+  const [marketCapAccepted, setMarketCapAccepted] = useState(false);
+
+  // Name mapping edits for unmatched
+  const [nameMappings, setNameMappings] = useState<NameMappingEntry[]>([]);
+  const [importConfirming, setImportConfirming] = useState(false);
+
+  // Import history
+  const [history, setHistory] = useState<ImportHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  // Upload file references
+  const [positionFile, setPositionFile] = useState<File | null>(null);
+  const [marketCapFile, setMarketCapFile] = useState<File | null>(null);
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/import-history");
+      const data = await res.json();
+      setHistory(data);
+    } catch {
+      // Silently fail for history
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  async function handlePositionFile(file: File) {
+    setPositionFile(file);
+    setPositionLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "positions");
+      formData.append("preview", "true");
+
+      const res = await fetch("/api/import", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Preview failed");
+      const preview: ImportPreview = await res.json();
+      setPositionPreview(preview);
+      setPositionAccepted(true);
+
+      // Initialize name mappings for unmatched
+      if (preview.unmatched.length > 0) {
+        setNameMappings(
+          preview.unmatched.map((u) => ({
+            bbgName: u.bbgName,
+            chineseName: u.suggestedName || "",
+          }))
+        );
+      }
+    } catch {
+      toast.error("文件解析失败");
+    } finally {
+      setPositionLoading(false);
+    }
+  }
+
+  async function handleMarketCapFile(file: File) {
+    setMarketCapFile(file);
+    setMarketCapLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "market_cap");
+      formData.append("preview", "true");
+
+      const res = await fetch("/api/import", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Preview failed");
+      const preview: ImportPreview = await res.json();
+      setMarketCapPreview(preview);
+      setMarketCapAccepted(true);
+    } catch {
+      toast.error("文件解析失败");
+    } finally {
+      setMarketCapLoading(false);
+    }
+  }
+
+  function updateNameMapping(index: number, chineseName: string) {
+    setNameMappings((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], chineseName };
+      return next;
+    });
+  }
+
+  async function handleConfirmImport() {
+    setImportConfirming(true);
+    try {
+      // Save name mappings first
+      const mappingsToSave = nameMappings.filter((m) => m.chineseName.trim());
+      if (mappingsToSave.length > 0) {
+        for (const mapping of mappingsToSave) {
+          await fetch("/api/name-mappings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(mapping),
+          });
+        }
+      }
+
+      // Confirm position import
+      if (positionFile) {
+        const formData = new FormData();
+        formData.append("file", positionFile);
+        formData.append("type", "positions");
+        formData.append("confirm", "true");
+
+        const res = await fetch("/api/import", {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) throw new Error("Import failed");
+      }
+
+      // Confirm market cap import
+      if (marketCapFile) {
+        const formData = new FormData();
+        formData.append("file", marketCapFile);
+        formData.append("type", "market_cap");
+        formData.append("confirm", "true");
+
+        const res = await fetch("/api/import", {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) throw new Error("Import failed");
+      }
+
+      toast.success("导入成功!");
+      setPositionPreview(null);
+      setMarketCapPreview(null);
+      setPositionAccepted(false);
+      setMarketCapAccepted(false);
+      setPositionFile(null);
+      setMarketCapFile(null);
+      setNameMappings([]);
+      fetchHistory();
+    } catch {
+      toast.error("导入失败");
+    } finally {
+      setImportConfirming(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">数据导入</h1>
+
+      {/* Drop Zones */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <DropZone
+          title="导入持仓数据"
+          description="上传 Bloomberg Export Excel 文件"
+          onFile={handlePositionFile}
+          loading={positionLoading}
+          accepted={positionAccepted}
+        />
+        <DropZone
+          title="刷新市值数据"
+          description="上传市值数据 Excel 文件"
+          onFile={handleMarketCapFile}
+          loading={marketCapLoading}
+          accepted={marketCapAccepted}
+        />
+      </div>
+
+      {/* Preview Section */}
+      {(positionPreview || marketCapPreview) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>导入预览</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              {positionPreview && (
+                <div className="rounded-lg border p-4 space-y-2">
+                  <h3 className="font-medium flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    持仓数据
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">总记录:</span>{" "}
+                      <span className="font-mono font-medium">
+                        {positionPreview.totalRecords}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">已匹配:</span>{" "}
+                      <span className="font-mono font-medium text-emerald-600">
+                        {positionPreview.matchedCount}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">未匹配:</span>{" "}
+                      <span className="font-mono font-medium text-rose-600">
+                        {positionPreview.unmatchedCount}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {marketCapPreview && (
+                <div className="rounded-lg border p-4 space-y-2">
+                  <h3 className="font-medium flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    市值数据
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">总记录:</span>{" "}
+                      <span className="font-mono font-medium">
+                        {marketCapPreview.totalRecords}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">已匹配:</span>{" "}
+                      <span className="font-mono font-medium text-emerald-600">
+                        {marketCapPreview.matchedCount}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">未匹配:</span>{" "}
+                      <span className="font-mono font-medium text-rose-600">
+                        {marketCapPreview.unmatchedCount}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Unmatched Names */}
+            {nameMappings.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <h4 className="text-sm font-medium">
+                    未匹配名称 - 请输入中文名称
+                  </h4>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Bloomberg 名称</TableHead>
+                      <TableHead>中文名称</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {nameMappings.map((mapping, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-sm">
+                          {mapping.bbgName}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={mapping.chineseName}
+                            onChange={(e) =>
+                              updateNameMapping(idx, e.target.value)
+                            }
+                            placeholder="输入中文名称"
+                            className="text-sm h-8"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={handleConfirmImport}
+                disabled={importConfirming}
+                size="lg"
+              >
+                {importConfirming && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                确认导入
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Import History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>导入历史</CardTitle>
+          <CardDescription>最近的数据导入记录</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {historyLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : history.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              暂无导入记录
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>类型</TableHead>
+                  <TableHead>文件名</TableHead>
+                  <TableHead className="text-right">总记录</TableHead>
+                  <TableHead className="text-right">新增</TableHead>
+                  <TableHead className="text-right">更新</TableHead>
+                  <TableHead>时间</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          item.importType === "positions"
+                            ? "default"
+                            : "secondary"
+                        }
+                      >
+                        {item.importType === "positions"
+                          ? "持仓"
+                          : "市值"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm font-mono">
+                      {item.fileName}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {item.recordCount}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-emerald-600">
+                      +{item.newCount}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-blue-600">
+                      {item.updatedCount}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(item.createdAt).toLocaleString("zh-CN")}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
