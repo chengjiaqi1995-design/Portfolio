@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllPositions, run, getPositionById, toPositionWithRelations } from "@/lib/db";
+import { getAllPositions, run, getPositionById, toPositionWithRelations, normalizeCompanyKey } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const companyMap = new Map<string, typeof positions[0]>();
 
     for (const pos of positions) {
-      const key = pos.nameEn || pos.tickerBbg;
+      const key = normalizeCompanyKey(pos.nameEn || pos.tickerBbg);
       const signedNmv = pos.longShort === "long" ? pos.positionAmount : -pos.positionAmount;
 
       if (companyMap.has(key)) {

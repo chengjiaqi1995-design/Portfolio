@@ -187,7 +187,7 @@ function EChartsScatter({ data, height = 220 }: {
       textStyle: { color: "#1A1A1A", fontSize: 11 },
       formatter: (params: any) => {
         const d = params.data;
-        return `<b>${d[2]}</b><br/>GMV: ${formatUsdK(d[0])}<br/>PNL: <span style="color:${d[1] >= 0 ? '#2D6A4F' : '#C0392B'}">${formatUsdK(d[1])}</span>`;
+        return `<b>${d.value[2]}</b><br/>GMV: ${formatUsdK(d.value[0])}<br/>PNL: <span style="color:${d.value[1] >= 0 ? '#2D6A4F' : '#C0392B'}">${formatUsdK(d.value[1])}</span>`;
       },
     },
     xAxis: {
@@ -206,10 +206,20 @@ function EChartsScatter({ data, height = 220 }: {
     },
     series: [{
       type: "scatter",
-      symbolSize: 8,
+      symbolSize: (val: number[]) => Math.max(6, Math.min(Math.sqrt(val[0] / 5000) * 3, 18)),
+      label: {
+        show: true,
+        formatter: (params: any) => params.value[2],
+        position: "top",
+        fontSize: 7,
+        color: "#6B6B6B",
+        overflow: "truncate",
+        width: 60,
+      },
+      labelLayout: { hideOverlap: true },
       data: data.map(d => ({
         value: [d.gmv, d.pnl, d.name, d.isLong],
-        itemStyle: { color: d.isLong ? "#2D6A4F" : "#C0392B", opacity: 0.7 },
+        itemStyle: { color: d.isLong ? "#B8860B" : "#6B6B6B", opacity: 0.8 },
       })),
     }],
   };

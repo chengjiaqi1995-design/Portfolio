@@ -258,6 +258,15 @@ export interface SnapshotRow {
 
 // ============ Summary computation ============
 
+// Normalize company names to merge cross-listed tickers (e.g. SANHUA ORD A + SANHUA ORD H)
+export function normalizeCompanyKey(nameEn: string): string {
+  return nameEn
+    .replace(/\s+ORD\s+[A-Z]$/i, '')    // Remove "ORD A", "ORD H"
+    .replace(/\s+COMPANY/i, '')          // Remove "COMPANY" (BYD COMPANY ORD H → BYD)
+    .replace(/\s+ORD$/i, '')             // Remove trailing "ORD"
+    .trim();
+}
+
 export interface SummaryByDimension {
   name: string;
   long: number;
@@ -289,7 +298,7 @@ export function getPortfolioSummary() {
   }>();
 
   for (const p of positionsWithNames) {
-    const key = p.nameEn || p.tickerBbg; // fallback to ticker if no name
+    const key = normalizeCompanyKey(p.nameEn || p.tickerBbg);
     const signedNmv = p.longShort === "long" ? p.positionAmount : -p.positionAmount;
 
     if (companyMap.has(key)) {
