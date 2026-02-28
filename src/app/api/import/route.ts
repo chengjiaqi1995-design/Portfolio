@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
     let updated = 0;
     const unmatched: { bbgName: string }[] = [];
     const zeroNmvTickers: { ticker: string; nmvRaw: string; nmvParsed: number }[] = [];
+    // Track tickers that already have valid NMV data — prevents a later duplicate row 
+    // (with missing NMV columns) from overwriting correct position data back to zero.
+    const importedWithNmv = new Set<string>();
 
     for (const row of rows) {
       const bbgName = findColumn(row, "underlying") || String(row["Underlying_Description"] ?? "").trim();
@@ -72,9 +75,11 @@ export async function POST(request: NextRequest) {
       // Many times Excel column headers have hidden spaces like "Latest NMV " or " Latest NMV".
       // We explicitly search the object keys to find the one that includes "latest nmv", case insensitive.
       let nmvRaw: unknown = "0";
+      let nmvColumnName = "(not found)";
       for (const key of Object.keys(row)) {
         if (key.toLowerCase().includes("latest nmv")) {
           nmvRaw = row[key];
+          nmvColumnName = key;
           break;
         }
       }
@@ -85,12 +90,40 @@ export async function POST(request: NextRequest) {
         for (const key of Object.keys(row)) {
           if (key.toLowerCase().includes("nmv excl cash")) {
             nmvRaw = row[key];
+            nmvColumnName = key;
+            break;
+          }
+        }
+      }
+
+      // Try broader NMV fallback — match any column containing just "nmv" (but not "avg")
+      if (nmvRaw === "0") {
+        for (const key of Object.keys(row)) {
+          const lk = key.toLowerCase();
+          if (lk.includes("nmv") && !lk.includes("avg")) {
+            nmvRaw = row[key];
+            nmvColumnName = key;
             break;
           }
         }
       }
 
       const nmvExclCash = parseFloat(String(nmvRaw).replace(/,/g, ''));
+
+      // Skip duplicate rows: if this ticker was already imported with valid NMV,
+      // don't let a second row (with missing NMV columns) overwrite it back to zero.
+      if ((isNaN(nmvExclCash) || nmvExclCash === 0) && importedWithNmv.has(tickerBbg)) {
+        continue;
+      }
+
+      // Read Avg NMV to determine long/short direction for closed positions (Latest NMV = 0)
+      let avgNmv = 0;
+      for (const key of Object.keys(row)) {
+        if (key.toLowerCase().includes("avg nmv")) {
+          avgNmv = parseFloat(String(row[key]).replace(/,/g, '')) || 0;
+          break;
+        }
+      }
 
       const mapping = nameMap.get(bbgName.toLowerCase());
       const chineseName = mapping ? mapping.chineseName : "";
@@ -104,6 +137,10 @@ export async function POST(request: NextRequest) {
       let longShort = "/";
       if (nmvExclCash > 0) longShort = "long";
       else if (nmvExclCash < 0) longShort = "short";
+      // When Latest NMV is 0 (closed position), use Avg NMV to determine direction
+      else if (nmvExclCash === 0 && avgNmv !== 0) {
+        longShort = avgNmv > 0 ? "long" : "short";
+      }
 
       const positionAmount = Math.abs(nmvExclCash);
       const positionWeight = positionAmount / AUM;
@@ -135,6 +172,11 @@ export async function POST(request: NextRequest) {
           gicIndustry, exchangeCountry, pnl
         ]
       );
+
+      // Remember tickers that have valid NMV so duplicate rows don't overwrite them
+      if (!isNaN(nmvExclCash) && nmvExclCash !== 0) {
+        importedWithNmv.add(tickerBbg);
+      }
       // We assume it's an update for logic simplicity, though it could be new
       updated++;
     }

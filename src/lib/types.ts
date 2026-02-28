@@ -25,6 +25,10 @@ export interface PositionWithRelations {
   gicIndustry?: string;
   exchangeCountry?: string;
   pnl?: number;
+  return1d?: number | null;
+  return1m?: number | null;
+  return1y?: number | null;
+  pricesUpdatedAt?: string | null;
 }
 
 export interface TaxonomyItem {

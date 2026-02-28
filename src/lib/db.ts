@@ -34,6 +34,10 @@ function runMigrations(db: Database.Database) {
     { column: "gicIndustry", type: "TEXT", defaultVal: "''" },
     { column: "exchangeCountry", type: "TEXT", defaultVal: "''" },
     { column: "pnl", type: "REAL", defaultVal: "0" },
+    { column: "return1d", type: "REAL", defaultVal: "NULL" },
+    { column: "return1m", type: "REAL", defaultVal: "NULL" },
+    { column: "return1y", type: "REAL", defaultVal: "NULL" },
+    { column: "pricesUpdatedAt", type: "TEXT", defaultVal: "NULL" },
   ];
 
   for (const m of migrations) {
@@ -99,6 +103,10 @@ export interface PositionRow {
   gicIndustry: string;
   exchangeCountry: string;
   pnl: number;
+  return1d: number | null;
+  return1m: number | null;
+  return1y: number | null;
+  pricesUpdatedAt: string | null;
   // Joined fields
   sectorName?: string;
   themeName?: string;
@@ -245,6 +253,10 @@ export function toPositionWithRelations(row: PositionRow) {
     gicIndustry: row.gicIndustry,
     exchangeCountry: row.exchangeCountry,
     pnl: row.pnl,
+    return1d: row.return1d,
+    return1m: row.return1m,
+    return1y: row.return1y,
+    pricesUpdatedAt: row.pricesUpdatedAt,
   };
 }
 
@@ -372,6 +384,30 @@ export function getPortfolioSummary() {
     addToDim(byRiskCountryMap, company.market || "其他");
     addToDim(byGicIndustryMap, company.gicIndustry || "其他");
     addToDim(byExchangeCountryMap, company.exchangeCountry || "其他");
+  }
+
+  // --- Step 3: Include PNL from closed positions (NMV=0 but PNL≠0) ---
+  // These don't affect exposure stats but their PNL should be counted.
+  const closedWithPnl = queryAll<PositionRow>(
+    POSITIONS_SELECT + " WHERE p.longShort = '/' AND ABS(p.pnl) > 0"
+  );
+
+  for (const p of closedWithPnl) {
+    const pnl = p.pnl || 0;
+    totalPnl += pnl;
+
+    // Add PNL-only to dimension maps (no exposure contribution)
+    const addPnlToDim = (map: Map<string, SummaryByDimension>, dimName: string) => {
+      if (!map.has(dimName)) map.set(dimName, { name: dimName, long: 0, short: 0, nmv: 0, gmv: 0, pnl: 0 });
+      map.get(dimName)!.pnl += pnl;
+    };
+
+    addPnlToDim(bySectorMap, p.market || "其他");
+    addPnlToDim(byIndustryMap, p.sectorName || "其他");
+    addPnlToDim(byThemeMap, p.topdownName || "Others");
+    addPnlToDim(byRiskCountryMap, p.market || "其他");
+    addPnlToDim(byGicIndustryMap, p.gicIndustry || "其他");
+    addPnlToDim(byExchangeCountryMap, p.exchangeCountry || "其他");
   }
 
   return {

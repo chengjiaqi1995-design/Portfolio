@@ -32,7 +32,7 @@ import { PieChart as EChartsPieChart, ScatterChart as EChartsScatterChart } from
 import { TooltipComponent, LegendComponent, GridComponent } from "echarts/components";
 import { LabelLayout } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
-import { Loader2, Pencil, X } from "lucide-react";
+import { Loader2, Pencil, X, RefreshCw, CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { PortfolioSummary, PositionWithRelations, SummaryByDimension } from "@/lib/types";
 
@@ -242,6 +242,36 @@ export default function DashboardPage() {
 
   const [editingAum, setEditingAum] = useState(false);
   const [aumInput, setAumInput] = useState("");
+  const [priceRefreshing, setPriceRefreshing] = useState(false);
+  const [earningsEvents, setEarningsEvents] = useState<{ tickerBbg: string; nameEn: string; longShort: string; earningsDate: string; timing: string; positionAmount: number }[]>(() => {
+    if (typeof window !== 'undefined') {
+      try { return JSON.parse(localStorage.getItem('earningsEvents') || '[]'); } catch { return []; }
+    }
+    return [];
+  });
+
+  // Fetch earnings on mount, cache in localStorage
+  useEffect(() => {
+    fetch("/api/earnings").then(r => r.json()).then(data => {
+      if (data.events) {
+        setEarningsEvents(data.events);
+        localStorage.setItem('earningsEvents', JSON.stringify(data.events));
+      }
+    }).catch(() => { });
+  }, []);
+
+  // Set of tickers with upcoming earnings for gold highlighting
+  const earningsTickers = useMemo(() => new Set(earningsEvents.map(e => e.tickerBbg)), [earningsEvents]);
+
+  async function refreshPrices() {
+    setPriceRefreshing(true);
+    try {
+      await fetch("/api/prices/update", { method: "POST" });
+      refreshData();
+    } finally {
+      setPriceRefreshing(false);
+    }
+  }
 
   function refreshData() {
     Promise.all([
@@ -311,13 +341,18 @@ export default function DashboardPage() {
 
   // Linked positions table — filtered by selected category
   const activePositions = useMemo(() => {
-    return positions.filter(p => (p.longShort === "long" || p.longShort === "short") && p.positionAmount > 0);
+    return positions.filter(p =>
+      // Active positions with NMV, or closed positions with PNL (NMV=0 but has direction from Avg NMV)
+      ((p.longShort === "long" || p.longShort === "short") && (p.positionAmount > 0 || Math.abs(p.pnl || 0) > 0)) ||
+      // Fallback: remaining "/" positions with PNL (no Avg NMV to determine direction)
+      (p.longShort === "/" && Math.abs(p.pnl || 0) > 0)
+    );
   }, [positions]);
 
   // Scatter plot data: all positions
   const scatterAllData = useMemo(() =>
     activePositions.map(p => ({
-      name: p.nameCn || p.nameEn,
+      name: p.nameEn,
       gmv: p.positionAmount,
       pnl: p.pnl || 0,
       isLong: p.longShort === "long",
@@ -343,11 +378,15 @@ export default function DashboardPage() {
   }, [activePositions, selectedCategory, dim]);
 
   const longPositions = useMemo(() =>
-    filteredPositions.filter(p => p.longShort === "long").sort((a, b) => b.positionAmount - a.positionAmount),
+    filteredPositions
+      .filter(p => p.longShort === "long" || (p.longShort === "/" && (p.pnl || 0) > 0))
+      .sort((a, b) => b.positionAmount - a.positionAmount),
     [filteredPositions]);
 
   const shortPositions = useMemo(() =>
-    filteredPositions.filter(p => p.longShort === "short").sort((a, b) => b.positionAmount - a.positionAmount),
+    filteredPositions
+      .filter(p => p.longShort === "short" || (p.longShort === "/" && (p.pnl || 0) < 0))
+      .sort((a, b) => b.positionAmount - a.positionAmount),
     [filteredPositions]);
 
   if (loading) {
@@ -369,19 +408,30 @@ export default function DashboardPage() {
   const barHeight = (data: any[]) => Math.max(80, data.length * 22);
   const tooltipBox = "rounded-md border border-[#E8E4DF] bg-white p-2 text-xs shadow-md";
 
+  function ReturnCell({ value }: { value: number | null | undefined }) {
+    if (value == null) return <TableCell className="px-0.5 py-0.5 text-[10px] font-mono text-right text-[var(--muted-foreground)]">—</TableCell>;
+    const pct = Math.round(value * 100);
+    const color = value >= 0 ? "text-emerald-700" : "text-rose-700";
+    return <TableCell className={`px-0.5 py-0.5 text-[10px] font-mono text-right ${color}`}>{value > 0 ? "+" : ""}{pct}%</TableCell>;
+  }
+
   function PositionRow({ pos, idx }: { pos: PositionWithRelations; idx: number }) {
     const isLong = pos.longShort === "long";
+    const hasEarnings = earningsTickers.has(pos.tickerBbg);
     return (
       <TableRow className="h-6">
-        <TableCell className="px-1.5 py-0.5 text-[11px] text-[var(--muted-foreground)] w-5">{idx + 1}</TableCell>
-        <TableCell className="px-1.5 py-0.5 text-[11px] font-medium truncate max-w-[100px]">{pos.nameCn || pos.nameEn}</TableCell>
-        <TableCell className="px-1.5 py-0.5 text-[10px] font-mono text-[var(--muted-foreground)]">{pos.tickerBbg}</TableCell>
-        <TableCell className={`px-1.5 py-0.5 text-[11px] font-mono text-right font-medium ${isLong ? "text-emerald-700" : "text-rose-700"}`}>
+        <TableCell className="px-1 py-0.5 text-[11px] text-[var(--muted-foreground)] w-4">{idx + 1}</TableCell>
+        <TableCell className={`px-1 py-0.5 text-[11px] font-medium truncate max-w-[80px] ${hasEarnings ? 'text-amber-600 font-semibold' : ''}`}>{pos.nameEn}</TableCell>
+        <TableCell className="px-1 py-0.5 text-[9px] font-mono text-[var(--muted-foreground)] truncate max-w-[70px]">{pos.tickerBbg.split(' / ')[0]}</TableCell>
+        <TableCell className={`px-1 py-0.5 text-[11px] font-mono text-right font-medium ${isLong ? "text-emerald-700" : "text-rose-700"}`}>
           {formatPct(pos.positionAmount / (summary?.aum || 1))}
         </TableCell>
-        <TableCell className={`px-1.5 py-0.5 text-[11px] font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+        <TableCell className={`px-1 py-0.5 text-[11px] font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
           {formatUsdK(pos.pnl || 0)}
         </TableCell>
+        <ReturnCell value={pos.return1d} />
+        <ReturnCell value={pos.return1m} />
+        <ReturnCell value={pos.return1y} />
       </TableRow>
     );
   }
@@ -434,10 +484,32 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* Earnings alert banner — only shown when there are upcoming earnings */}
+      {earningsEvents.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-amber-200 bg-amber-50 text-amber-900">
+          <CalendarDays className="h-3.5 w-3.5 flex-shrink-0 text-amber-600" />
+          <span className="text-[11px] font-medium">Earnings:</span>
+          <span className="text-[11px] truncate">
+            {earningsEvents.map((e, i) => {
+              const d = new Date(e.earningsDate);
+              const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              const isLong = e.longShort === 'long';
+              return (
+                <span key={i}>
+                  {i > 0 && <span className="text-amber-400 mx-1">·</span>}
+                  <span className={isLong ? 'text-emerald-700' : 'text-rose-700'}>{e.nameEn}</span>
+                  <span className="text-amber-600 ml-0.5">({dateStr}{e.timing ? ` ${e.timing}` : ''})</span>
+                </span>
+              );
+            })}
+          </span>
+        </div>
+      )}
+
       {/* Main area: Charts (left) + Positions (right) */}
       <div className="flex gap-3" style={{ minHeight: "calc(100vh - 200px)" }}>
         {/* LEFT: Charts (compact) */}
-        <div className="w-[55%] flex-shrink-0 min-w-0 space-y-3">
+        <div className="w-[48%] flex-shrink-0 min-w-0 space-y-3">
           {/* NET row */}
           <div className="grid grid-cols-2 gap-3">
             <Card className="py-1.5">
@@ -568,7 +640,7 @@ export default function DashboardPage() {
               <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">GMV vs PNL — All</CardTitle></CardHeader>
               <CardContent className="px-1 py-0">
                 {scatterAllData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> :
-                  <EChartsScatter data={scatterAllData} height={260} />}
+                  <EChartsScatter data={scatterAllData} height={400} />}
               </CardContent>
             </Card>
             <Card className="py-1.5">
@@ -579,7 +651,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="px-1 py-0">
                 {scatterDimData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> :
-                  <EChartsScatter data={scatterDimData} height={260} />}
+                  <EChartsScatter data={scatterDimData} height={400} />}
               </CardContent>
             </Card>
           </div>
@@ -587,7 +659,7 @@ export default function DashboardPage() {
 
         {/* RIGHT: Linked Positions Table */}
         <div className="flex-1 min-w-0">
-          <Card className="sticky top-0 flex flex-col py-1.5" style={{ maxHeight: "calc(100vh - 200px)" }}>
+          <Card className="sticky top-0 flex flex-col py-1.5" style={{ height: "calc(100vh - 80px)" }}>
             {/* Compact header — same height as chart card titles */}
             <CardHeader className="px-3 py-1 flex-shrink-0">
               <div className="flex items-center justify-between">
@@ -598,6 +670,14 @@ export default function DashboardPage() {
                   <span className={`small-caps text-[0.5625rem] ${selectedCategory ? 'text-[var(--accent)]' : 'text-[var(--muted-foreground)]'}`}>
                     {longPositions.length}L / {shortPositions.length}S
                   </span>
+                  <button
+                    onClick={refreshPrices}
+                    disabled={priceRefreshing}
+                    className="text-[var(--muted-foreground)] hover:text-[var(--accent)] transition-colors p-0.5 rounded hover:bg-[var(--muted)] disabled:opacity-40"
+                    title="Refresh stock prices"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${priceRefreshing ? 'animate-spin' : ''}`} />
+                  </button>
                   {selectedCategory && (
                     <button
                       onClick={() => setSelectedCategory(null)}
@@ -623,11 +703,14 @@ export default function DashboardPage() {
                     ) : (
                       <Table>
                         <TableHeader><TableRow>
-                          <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
-                          <TableHead className="px-1.5 text-[10px]">Company</TableHead>
-                          <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
-                          <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
-                          <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
+                          <TableHead className="w-4 px-1 text-[10px]">#</TableHead>
+                          <TableHead className="px-1 text-[10px]">Company</TableHead>
+                          <TableHead className="px-1 text-[10px]">Ticker</TableHead>
+                          <TableHead className="px-1 text-[10px] text-right">Wgt</TableHead>
+                          <TableHead className="px-1 text-[10px] text-right">PNL</TableHead>
+                          <TableHead className="px-0.5 text-[10px] text-right">1D</TableHead>
+                          <TableHead className="px-0.5 text-[10px] text-right">1M</TableHead>
+                          <TableHead className="px-0.5 text-[10px] text-right">1Y</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
                           {longPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
@@ -647,11 +730,14 @@ export default function DashboardPage() {
                     ) : (
                       <Table>
                         <TableHeader><TableRow>
-                          <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
-                          <TableHead className="px-1.5 text-[10px]">Company</TableHead>
-                          <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
-                          <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
-                          <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
+                          <TableHead className="w-4 px-1 text-[10px]">#</TableHead>
+                          <TableHead className="px-1 text-[10px]">Company</TableHead>
+                          <TableHead className="px-1 text-[10px]">Ticker</TableHead>
+                          <TableHead className="px-1 text-[10px] text-right">Wgt</TableHead>
+                          <TableHead className="px-1 text-[10px] text-right">PNL</TableHead>
+                          <TableHead className="px-0.5 text-[10px] text-right">1D</TableHead>
+                          <TableHead className="px-0.5 text-[10px] text-right">1M</TableHead>
+                          <TableHead className="px-0.5 text-[10px] text-right">1Y</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
                           {shortPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
