@@ -481,41 +481,41 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* RIGHT: Linked Positions Table — single card, Long & Short side by side */}
+        {/* RIGHT: Linked Positions Table */}
         <div className="flex-1 min-w-0">
-          <Card className="sticky top-0 flex flex-col" style={{ maxHeight: "calc(100vh - 200px)" }}>
-            {/* Card Header: title + stats + clear */}
-            <CardHeader className="px-4 py-2 border-b border-[var(--border)] flex-shrink-0">
+          <Card className="sticky top-0 flex flex-col py-1.5" style={{ maxHeight: "calc(100vh - 200px)" }}>
+            {/* Compact header — same height as chart card titles */}
+            <CardHeader className="px-3 py-1 flex-shrink-0">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="font-serif text-sm font-semibold">
-                    {selectedCategory ? selectedCategory : "All Positions"}
-                  </CardTitle>
-                  <p className={`small-caps text-[0.5625rem] mt-0.5 ${selectedCategory ? 'text-[var(--accent)]' : ''}`}>
-                    {longPositions.length}L / {shortPositions.length}S{!selectedCategory && ' · Click chart to filter'}
-                  </p>
+                <CardTitle className="font-serif text-sm font-semibold">
+                  {selectedCategory ? selectedCategory : "All Positions"}
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className={`small-caps text-[0.5625rem] ${selectedCategory ? 'text-[var(--accent)]' : 'text-[var(--muted-foreground)]'}`}>
+                    {longPositions.length}L / {shortPositions.length}S
+                  </span>
+                  {selectedCategory && (
+                    <button
+                      onClick={() => setSelectedCategory(null)}
+                      className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-0.5 rounded hover:bg-[var(--muted)]"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
-                {selectedCategory && (
-                  <button
-                    onClick={() => setSelectedCategory(null)}
-                    className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 rounded hover:bg-[var(--muted)]"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
               </div>
             </CardHeader>
-            {/* Card Body: two columns */}
+            {/* Two columns */}
             <CardContent className="px-0 py-0 flex-1 overflow-hidden">
               <div className="grid grid-cols-2 h-full">
                 {/* Long column */}
                 <div className="border-r border-[var(--border)] flex flex-col overflow-hidden">
-                  <div className="px-3 py-1.5 border-b border-[var(--border)] flex-shrink-0 bg-emerald-50/30">
-                    <span className="small-caps text-[0.5625rem] text-emerald-700">Long · {longPositions.length}</span>
+                  <div className="px-3 py-1 border-b border-[var(--border)] flex-shrink-0">
+                    <span className="small-caps text-[0.5rem] text-[var(--muted-foreground)]">Long · {longPositions.length}</span>
                   </div>
                   <div className="flex-1 overflow-y-auto">
                     {longPositions.length === 0 ? (
-                      <p className="text-xs text-[var(--muted-foreground)] py-6 text-center">No longs</p>
+                      <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No longs</p>
                     ) : (
                       <Table>
                         <TableHeader><TableRow>
@@ -534,12 +534,12 @@ export default function DashboardPage() {
                 </div>
                 {/* Short column */}
                 <div className="flex flex-col overflow-hidden">
-                  <div className="px-3 py-1.5 border-b border-[var(--border)] flex-shrink-0 bg-rose-50/30">
-                    <span className="small-caps text-[0.5625rem] text-rose-700">Short · {shortPositions.length}</span>
+                  <div className="px-3 py-1 border-b border-[var(--border)] flex-shrink-0">
+                    <span className="small-caps text-[0.5rem] text-[var(--muted-foreground)]">Short · {shortPositions.length}</span>
                   </div>
                   <div className="flex-1 overflow-y-auto">
                     {shortPositions.length === 0 ? (
-                      <p className="text-xs text-[var(--muted-foreground)] py-6 text-center">No shorts</p>
+                      <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No shorts</p>
                     ) : (
                       <Table>
                         <TableHeader><TableRow>
