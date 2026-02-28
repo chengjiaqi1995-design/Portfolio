@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -65,7 +65,6 @@ const DIM_TABS: { key: Dimension; label: string }[] = [
   { key: "exchangeCountry", label: "Exchange Country" },
 ];
 
-// Warm editorial pie colors
 const PIE_COLORS = [
   "#B8860B", "#2D6A4F", "#4A6FA5", "#C77D4F", "#7B6D8D",
   "#D4A84B", "#3D8B6E", "#6B8FC2", "#D9976A", "#9B8DAA",
@@ -91,15 +90,21 @@ function getDimValue(p: PositionWithRelations, dim: Dimension): string {
   return p.exchangeCountry || "Other";
 }
 
-// ===== ECharts Pie — Serif-themed =====
-function EChartsPie({ data, formatter, height = 280 }: { data: { name: string; value: number }[]; formatter?: (value: number) => string; height?: number }) {
+// ===== ECharts Pie — with click callback =====
+function EChartsPie({ data, formatter, height = 220, selected, onSelect }: {
+  data: { name: string; value: number }[];
+  formatter?: (value: number) => string;
+  height?: number;
+  selected?: string | null;
+  onSelect?: (name: string | null) => void;
+}) {
   const option = {
     tooltip: {
       trigger: "item",
       backgroundColor: "#FFFFFF",
       borderColor: "#E8E4DF",
       borderWidth: 1,
-      textStyle: { color: "#1A1A1A", fontSize: 12 },
+      textStyle: { color: "#1A1A1A", fontSize: 11 },
       formatter: (params: any) => {
         const pct = params.percent.toFixed(1);
         const val = formatter ? formatter(params.value) : `${params.value}%`;
@@ -111,45 +116,61 @@ function EChartsPie({ data, formatter, height = 280 }: { data: { name: string; v
       orient: "vertical",
       right: 0,
       top: "middle",
-      textStyle: { fontSize: 10, color: "#6B6B6B" },
-      formatter: (name: string) => name.length > 10 ? name.slice(0, 10) + "\u2026" : name,
-      itemWidth: 10,
-      itemHeight: 10,
+      textStyle: { fontSize: 9, color: "#6B6B6B" },
+      formatter: (name: string) => name.length > 8 ? name.slice(0, 8) + "\u2026" : name,
+      itemWidth: 8,
+      itemHeight: 8,
     },
     series: [{
       type: "pie",
-      radius: ["20%", "58%"],
-      center: ["32%", "50%"],
+      radius: ["18%", "55%"],
+      center: ["30%", "50%"],
       avoidLabelOverlap: true,
       itemStyle: { borderRadius: 3, borderColor: "#FAFAF8", borderWidth: 2 },
       label: {
         show: true,
         formatter: (params: any) => {
-          if (params.percent < 4) return "";
+          if (params.percent < 5) return "";
           return `${params.name}\n${params.percent.toFixed(1)}%`;
         },
-        fontSize: 10,
-        lineHeight: 13,
+        fontSize: 9,
+        lineHeight: 12,
         color: "#1A1A1A",
       },
-      labelLine: { show: true, length: 6, length2: 10, lineStyle: { color: "#E8E4DF" } },
+      labelLine: { show: true, length: 4, length2: 8, lineStyle: { color: "#E8E4DF" } },
       emphasis: {
-        label: { show: true, fontSize: 12, fontWeight: "bold" },
+        label: { show: true, fontSize: 11, fontWeight: "bold" },
         itemStyle: { shadowBlur: 8, shadowColor: "rgba(184,134,11,0.2)" },
       },
-      data: data.map((d, i) => ({ ...d, itemStyle: { color: PIE_COLORS[i % PIE_COLORS.length] } })),
+      selectedMode: "single",
+      data: data.map((d, i) => ({
+        ...d,
+        itemStyle: {
+          color: PIE_COLORS[i % PIE_COLORS.length],
+          opacity: selected && selected !== d.name ? 0.3 : 1,
+        },
+        selected: selected === d.name,
+      })),
     }],
   };
+
+  const onEvents = onSelect ? {
+    click: (params: any) => {
+      onSelect(params.name === selected ? null : params.name);
+    },
+  } : {};
+
   return (
-    <ReactEChartsCore echarts={echarts} option={option}
-      style={{ height, width: "100%" }} opts={{ renderer: "canvas" }} notMerge={true} />
+    <ReactEChartsCore echarts={echarts} option={option} onEvents={onEvents}
+      style={{ height, width: "100%", cursor: onSelect ? "pointer" : "default" }}
+      opts={{ renderer: "canvas" }} notMerge={true} />
   );
 }
 
 function calcYAxisWidth(data: { name: string }[]) {
   if (data.length === 0) return 60;
   const maxLen = Math.max(...data.map(d => d.name.length));
-  return Math.min(Math.max(maxLen * 7, 60), 150);
+  return Math.min(Math.max(maxLen * 7, 60), 130);
 }
 
 export default function DashboardPage() {
@@ -157,8 +178,10 @@ export default function DashboardPage() {
   const [positions, setPositions] = useState<PositionWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [dim, setDim] = useState<Dimension>("riskCountry");
-  const [selectedNetBar, setSelectedNetBar] = useState<string | null>(null);
-  const [selectedGmvBar, setSelectedGmvBar] = useState<string | null>(null);
+
+  // Single unified selected category — shared across all 6 charts
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
   const [editingAum, setEditingAum] = useState(false);
   const [aumInput, setAumInput] = useState("");
 
@@ -186,7 +209,12 @@ export default function DashboardPage() {
     refreshData();
   }
 
-  useEffect(() => { setSelectedNetBar(null); setSelectedGmvBar(null); }, [dim]);
+  // Reset selection on dimension change
+  useEffect(() => { setSelectedCategory(null); }, [dim]);
+
+  const toggleCategory = useCallback((name: string | null) => {
+    setSelectedCategory(prev => prev === name ? null : name);
+  }, []);
 
   const dimData = useMemo(() => {
     if (!summary) return [];
@@ -223,19 +251,23 @@ export default function DashboardPage() {
       .map(d => ({ name: d.name, value: Math.round(Math.abs(d.pnl)) })),
     [dimData]);
 
-  const drillNetPositions = useMemo(() => {
-    if (!selectedNetBar) return [];
-    return positions
-      .filter(p => (p.longShort === "long" || p.longShort === "short") && getDimValue(p, dim) === selectedNetBar)
-      .sort((a, b) => b.positionAmount - a.positionAmount);
-  }, [selectedNetBar, positions, dim]);
+  // Linked positions table — filtered by selected category
+  const activePositions = useMemo(() => {
+    return positions.filter(p => p.longShort === "long" || p.longShort === "short");
+  }, [positions]);
 
-  const drillGmvPositions = useMemo(() => {
-    if (!selectedGmvBar) return [];
-    return positions
-      .filter(p => (p.longShort === "long" || p.longShort === "short") && getDimValue(p, dim) === selectedGmvBar)
-      .sort((a, b) => Math.abs(b.positionAmount) - Math.abs(a.positionAmount));
-  }, [selectedGmvBar, positions, dim]);
+  const filteredPositions = useMemo(() => {
+    if (!selectedCategory) return activePositions;
+    return activePositions.filter(p => getDimValue(p, dim) === selectedCategory);
+  }, [activePositions, selectedCategory, dim]);
+
+  const longPositions = useMemo(() =>
+    filteredPositions.filter(p => p.longShort === "long").sort((a, b) => b.positionAmount - a.positionAmount),
+    [filteredPositions]);
+
+  const shortPositions = useMemo(() =>
+    filteredPositions.filter(p => p.longShort === "short").sort((a, b) => b.positionAmount - a.positionAmount),
+    [filteredPositions]);
 
   if (loading) {
     return <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" /></div>;
@@ -253,59 +285,28 @@ export default function DashboardPage() {
     { label: "PNL", value: formatUsdK(summary.totalPnl || 0), color: (summary.totalPnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700" },
   ];
 
-  const longPositions = positions.filter(p => p.longShort === "long").sort((a, b) => b.positionAmount - a.positionAmount).slice(0, 10);
-  const shortPositions = positions.filter(p => p.longShort === "short").sort((a, b) => b.positionAmount - a.positionAmount).slice(0, 10);
+  const barHeight = (data: any[]) => Math.max(80, data.length * 22);
+  const tooltipBox = "rounded-md border border-[#E8E4DF] bg-white p-2 text-xs shadow-md";
 
-  function DrillTable({ selected, data, onClose }: { selected: string; data: PositionWithRelations[]; onClose: () => void }) {
+  function PositionRow({ pos, idx }: { pos: PositionWithRelations; idx: number }) {
+    const isLong = pos.longShort === "long";
     return (
-      <div className="mt-2 mb-2 mx-1 border border-[var(--border)] rounded-md">
-        <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--muted)]/50 border-b border-[var(--border)]">
-          <span className="small-caps text-[0.625rem] text-[var(--accent)]">{selected} — {data.length} positions</span>
-          <button onClick={onClose} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"><X className="h-3.5 w-3.5" /></button>
-        </div>
-        {data.length === 0 ? (
-          <p className="text-xs text-[var(--muted-foreground)] py-3 text-center">No positions</p>
-        ) : (
-          <Table>
-            <TableHeader><TableRow>
-              <TableHead className="px-2 text-xs">Company</TableHead>
-              <TableHead className="px-2 text-xs">Ticker</TableHead>
-              <TableHead className="px-2 text-xs">L/S</TableHead>
-              <TableHead className="px-2 text-xs text-right">Weight</TableHead>
-              <TableHead className="px-2 text-xs text-right">PNL</TableHead>
-            </TableRow></TableHeader>
-            <TableBody>
-              {data.map(pos => (
-                <TableRow key={pos.id} className="h-7">
-                  <TableCell className="px-2 py-1 text-xs font-medium truncate max-w-[120px]">{pos.nameCn || pos.nameEn}</TableCell>
-                  <TableCell className="px-2 py-1 text-[11px] font-mono text-[var(--muted-foreground)]">{pos.tickerBbg}</TableCell>
-                  <TableCell className="px-2 py-1">
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${pos.longShort === "long" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                      {pos.longShort === "long" ? "L" : "S"}
-                    </span>
-                  </TableCell>
-                  <TableCell className={`px-2 py-1 text-xs font-mono text-right font-medium ${pos.longShort === "long" ? "text-emerald-700" : "text-rose-700"}`}>
-                    {formatPct(pos.positionAmount / (summary?.aum || 1))}
-                  </TableCell>
-                  <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                    {formatUsdK(pos.pnl || 0)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+      <TableRow className="h-6">
+        <TableCell className="px-1.5 py-0.5 text-[11px] text-[var(--muted-foreground)] w-5">{idx + 1}</TableCell>
+        <TableCell className="px-1.5 py-0.5 text-[11px] font-medium truncate max-w-[100px]">{pos.nameCn || pos.nameEn}</TableCell>
+        <TableCell className="px-1.5 py-0.5 text-[10px] font-mono text-[var(--muted-foreground)]">{pos.tickerBbg}</TableCell>
+        <TableCell className={`px-1.5 py-0.5 text-[11px] font-mono text-right font-medium ${isLong ? "text-emerald-700" : "text-rose-700"}`}>
+          {formatPct(pos.positionAmount / summary.aum)}
+        </TableCell>
+        <TableCell className={`px-1.5 py-0.5 text-[11px] font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+          {formatUsdK(pos.pnl || 0)}
+        </TableCell>
+      </TableRow>
     );
   }
 
-  const barHeight = (data: any[]) => Math.max(100, data.length * 26);
-
-  // Recharts tooltip style
-  const tooltipBox = "rounded-md border border-[#E8E4DF] bg-white p-2 text-xs shadow-md";
-
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header + Global Dimension Selector */}
       <div className="flex items-center justify-between">
         <div>
@@ -352,200 +353,214 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Row 1: NET — Bar + Pie */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1.5">
-            <CardTitle className="font-serif text-base font-semibold">Net Exposure</CardTitle>
-          </CardHeader>
-          <CardContent className="px-1 py-0">
-            {netData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : (
-              <ResponsiveContainer width="100%" height={barHeight(netData)}>
-                <BarChart data={netData} layout="vertical" margin={{ top: 2, right: 35, left: 2, bottom: 2 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DF" />
-                  <XAxis type="number" tickFormatter={v => `${v}%`} tick={{ fontSize: 9, fill: "#6B6B6B" }} />
-                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(netData)} tick={{ fontSize: 9, fill: "#1A1A1A" }} />
-                  <Tooltip content={({ active, payload, label }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = payload[0].payload;
-                    return (<div className={tooltipBox}>
-                      <p className="font-medium mb-1">{label}</p>
-                      <p>Net: <span className={d.nmv >= 0 ? "text-emerald-700" : "text-rose-700"}>{d.nmv}%</span></p>
-                      <p className="text-emerald-700">Long: {d.long}%</p>
-                      <p className="text-rose-700">Short: {d.short}%</p>
-                    </div>);
-                  }} />
-                  <Bar dataKey="nmv" barSize={12} radius={[0, 3, 3, 0]} cursor="pointer"
-                    onClick={(data: any) => setSelectedNetBar(prev => prev === data.name ? null : data.name)} isAnimationActive={false}>
-                    {netData.map((entry, i) => (
-                      <Cell key={i} fill={entry.nmv >= 0 ? "#2D6A4F" : "#C0392B"} opacity={selectedNetBar && selectedNetBar !== entry.name ? 0.3 : 1} />
-                    ))}
-                    <LabelList dataKey="nmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 9, fill: "#6B6B6B" }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-            {selectedNetBar && <DrillTable selected={selectedNetBar} data={drillNetPositions} onClose={() => setSelectedNetBar(null)} />}
-          </CardContent>
-        </Card>
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1.5">
-            <CardTitle className="font-serif text-base font-semibold">NET Distribution</CardTitle>
-          </CardHeader>
-          <CardContent className="px-1 py-0">
-            {netPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : <EChartsPie data={netPieData} />}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Main area: Charts (left) + Positions (right) */}
+      <div className="flex gap-3" style={{ minHeight: "calc(100vh - 200px)" }}>
+        {/* LEFT: Charts */}
+        <div className="flex-1 min-w-0 space-y-3">
+          {/* NET row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">Net Exposure</CardTitle></CardHeader>
+              <CardContent className="px-1 py-0">
+                {netData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : (
+                  <ResponsiveContainer width="100%" height={barHeight(netData)}>
+                    <BarChart data={netData} layout="vertical" margin={{ top: 2, right: 30, left: 2, bottom: 2 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DF" />
+                      <XAxis type="number" tickFormatter={v => `${v}%`} tick={{ fontSize: 8, fill: "#6B6B6B" }} />
+                      <YAxis type="category" dataKey="name" width={calcYAxisWidth(netData)} tick={{ fontSize: 8, fill: "#1A1A1A" }} />
+                      <Tooltip content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload;
+                        return (<div className={tooltipBox}>
+                          <p className="font-medium mb-1">{label}</p>
+                          <p>Net: <span className={d.nmv >= 0 ? "text-emerald-700" : "text-rose-700"}>{d.nmv}%</span></p>
+                          <p className="text-emerald-700">Long: {d.long}%</p>
+                          <p className="text-rose-700">Short: {d.short}%</p>
+                        </div>);
+                      }} />
+                      <Bar dataKey="nmv" barSize={10} radius={[0, 3, 3, 0]} cursor="pointer"
+                        onClick={(data: any) => toggleCategory(data.name)} isAnimationActive={false}>
+                        {netData.map((entry, i) => (
+                          <Cell key={i} fill={entry.nmv >= 0 ? "#2D6A4F" : "#C0392B"} opacity={selectedCategory && selectedCategory !== entry.name ? 0.25 : 1} />
+                        ))}
+                        <LabelList dataKey="nmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 8, fill: "#6B6B6B" }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">NET Distribution</CardTitle></CardHeader>
+              <CardContent className="px-1 py-0">
+                {netPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> :
+                  <EChartsPie data={netPieData} height={barHeight(netData)} selected={selectedCategory} onSelect={toggleCategory} />}
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Row 2: GMV — Bar + Pie */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1.5">
-            <CardTitle className="font-serif text-base font-semibold">Gross Exposure</CardTitle>
-          </CardHeader>
-          <CardContent className="px-1 py-0">
-            {gmvData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : (
-              <ResponsiveContainer width="100%" height={barHeight(gmvData)}>
-                <BarChart data={gmvData} layout="vertical" margin={{ top: 2, right: 35, left: 2, bottom: 2 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DF" />
-                  <XAxis type="number" tickFormatter={v => `${v}%`} tick={{ fontSize: 9, fill: "#6B6B6B" }} />
-                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(gmvData)} tick={{ fontSize: 9, fill: "#1A1A1A" }} />
-                  <Tooltip content={({ active, payload, label }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = payload[0].payload;
-                    return (<div className={tooltipBox}>
-                      <p className="font-medium mb-1">{label}</p>
-                      <p>Gross: <span className="text-[var(--accent)]">{d.gmv}%</span></p>
-                      <p className="text-emerald-700">Long: {d.long}%</p>
-                      <p className="text-rose-700">Short: {d.short}%</p>
-                    </div>);
-                  }} />
-                  <Bar dataKey="gmv" barSize={12} radius={[0, 3, 3, 0]} cursor="pointer"
-                    onClick={(data: any) => setSelectedGmvBar(prev => prev === data.name ? null : data.name)} isAnimationActive={false}>
-                    {gmvData.map((entry, i) => (
-                      <Cell key={i} fill="#B8860B" opacity={selectedGmvBar && selectedGmvBar !== entry.name ? 0.3 : 1} />
-                    ))}
-                    <LabelList dataKey="gmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 9, fill: "#6B6B6B" }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-            {selectedGmvBar && <DrillTable selected={selectedGmvBar} data={drillGmvPositions} onClose={() => setSelectedGmvBar(null)} />}
-          </CardContent>
-        </Card>
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1.5">
-            <CardTitle className="font-serif text-base font-semibold">GMV Distribution</CardTitle>
-          </CardHeader>
-          <CardContent className="px-1 py-0">
-            {gmvPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : <EChartsPie data={gmvPieData} />}
-          </CardContent>
-        </Card>
-      </div>
+          {/* GMV row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">Gross Exposure</CardTitle></CardHeader>
+              <CardContent className="px-1 py-0">
+                {gmvData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : (
+                  <ResponsiveContainer width="100%" height={barHeight(gmvData)}>
+                    <BarChart data={gmvData} layout="vertical" margin={{ top: 2, right: 30, left: 2, bottom: 2 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DF" />
+                      <XAxis type="number" tickFormatter={v => `${v}%`} tick={{ fontSize: 8, fill: "#6B6B6B" }} />
+                      <YAxis type="category" dataKey="name" width={calcYAxisWidth(gmvData)} tick={{ fontSize: 8, fill: "#1A1A1A" }} />
+                      <Tooltip content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload;
+                        return (<div className={tooltipBox}>
+                          <p className="font-medium mb-1">{label}</p>
+                          <p>Gross: <span className="text-[var(--accent)]">{d.gmv}%</span></p>
+                          <p className="text-emerald-700">Long: {d.long}%</p>
+                          <p className="text-rose-700">Short: {d.short}%</p>
+                        </div>);
+                      }} />
+                      <Bar dataKey="gmv" barSize={10} radius={[0, 3, 3, 0]} cursor="pointer"
+                        onClick={(data: any) => toggleCategory(data.name)} isAnimationActive={false}>
+                        {gmvData.map((entry, i) => (
+                          <Cell key={i} fill="#B8860B" opacity={selectedCategory && selectedCategory !== entry.name ? 0.25 : 1} />
+                        ))}
+                        <LabelList dataKey="gmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 8, fill: "#6B6B6B" }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">GMV Distribution</CardTitle></CardHeader>
+              <CardContent className="px-1 py-0">
+                {gmvPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> :
+                  <EChartsPie data={gmvPieData} height={barHeight(gmvData)} selected={selectedCategory} onSelect={toggleCategory} />}
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Row 3: PNL — Bar + Pie */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1.5">
-            <CardTitle className="font-serif text-base font-semibold">PNL Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent className="px-1 py-0">
-            {pnlData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No PNL data</p> : (
-              <ResponsiveContainer width="100%" height={barHeight(pnlData)}>
-                <BarChart data={pnlData} layout="vertical" margin={{ top: 2, right: 45, left: 2, bottom: 2 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DF" />
-                  <XAxis type="number" tickFormatter={v => formatUsdK(v)} tick={{ fontSize: 9, fill: "#6B6B6B" }} />
-                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(pnlData)} tick={{ fontSize: 9, fill: "#1A1A1A" }} />
-                  <Tooltip content={({ active, payload, label }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = payload[0].payload;
-                    return (<div className={tooltipBox}>
-                      <p className="font-medium mb-1">{label}</p>
-                      <p>PNL: <span className={d.pnl >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatUsdK(d.pnl)}</span></p>
-                    </div>);
-                  }} />
-                  <Bar dataKey="pnl" barSize={12} radius={[0, 3, 3, 0]} isAnimationActive={false}>
-                    {pnlData.map((entry, i) => <Cell key={i} fill={entry.pnl >= 0 ? "#2D6A4F" : "#C0392B"} />)}
-                    <LabelList dataKey="pnl" position="right" formatter={(v: any) => formatUsdK(v)} style={{ fontSize: 9, fill: "#6B6B6B" }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1.5">
-            <CardTitle className="font-serif text-base font-semibold">PNL Distribution</CardTitle>
-          </CardHeader>
-          <CardContent className="px-1 py-0">
-            {pnlPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No PNL data</p> : <EChartsPie data={pnlPieData} formatter={formatUsdK} />}
-          </CardContent>
-        </Card>
-      </div>
+          {/* PNL row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">PNL Breakdown</CardTitle></CardHeader>
+              <CardContent className="px-1 py-0">
+                {pnlData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No PNL data</p> : (
+                  <ResponsiveContainer width="100%" height={barHeight(pnlData)}>
+                    <BarChart data={pnlData} layout="vertical" margin={{ top: 2, right: 40, left: 2, bottom: 2 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DF" />
+                      <XAxis type="number" tickFormatter={v => formatUsdK(v)} tick={{ fontSize: 8, fill: "#6B6B6B" }} />
+                      <YAxis type="category" dataKey="name" width={calcYAxisWidth(pnlData)} tick={{ fontSize: 8, fill: "#1A1A1A" }} />
+                      <Tooltip content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload;
+                        return (<div className={tooltipBox}>
+                          <p className="font-medium mb-1">{label}</p>
+                          <p>PNL: <span className={d.pnl >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatUsdK(d.pnl)}</span></p>
+                        </div>);
+                      }} />
+                      <Bar dataKey="pnl" barSize={10} radius={[0, 3, 3, 0]} cursor="pointer"
+                        onClick={(data: any) => toggleCategory(data.name)} isAnimationActive={false}>
+                        {pnlData.map((entry, i) => (
+                          <Cell key={i} fill={entry.pnl >= 0 ? "#2D6A4F" : "#C0392B"} opacity={selectedCategory && selectedCategory !== entry.name ? 0.25 : 1} />
+                        ))}
+                        <LabelList dataKey="pnl" position="right" formatter={(v: any) => formatUsdK(v)} style={{ fontSize: 8, fill: "#6B6B6B" }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">PNL Distribution</CardTitle></CardHeader>
+              <CardContent className="px-1 py-0">
+                {pnlPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No PNL data</p> :
+                  <EChartsPie data={pnlPieData} formatter={formatUsdK} height={barHeight(pnlData)} selected={selectedCategory} onSelect={toggleCategory} />}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-      {/* Top Positions */}
-      <div className="flex items-center gap-4 mt-2">
-        <span className="h-px flex-1 bg-[var(--border)]" />
-        <span className="small-caps text-[var(--accent)]">Top Holdings</span>
-        <span className="h-px flex-1 bg-[var(--border)]" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1.5">
-            <CardTitle className="font-serif text-base font-semibold">Top 10 Long</CardTitle>
-          </CardHeader>
-          <CardContent className="px-2 py-0">
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead className="w-6 px-2 text-xs">#</TableHead>
-                <TableHead className="px-2 text-xs">Company</TableHead>
-                <TableHead className="px-2 text-xs">Ticker</TableHead>
-                <TableHead className="px-2 text-xs text-right">Weight</TableHead>
-                <TableHead className="px-2 text-xs text-right">PNL</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {longPositions.map((pos, idx) => (
-                  <TableRow key={pos.id} className="h-7">
-                    <TableCell className="px-2 py-1 text-xs text-[var(--muted-foreground)]">{idx + 1}</TableCell>
-                    <TableCell className="px-2 py-1 text-xs font-medium truncate max-w-[120px]">{pos.nameCn || pos.nameEn}</TableCell>
-                    <TableCell className="px-2 py-1 text-[11px] font-mono text-[var(--muted-foreground)]">{pos.tickerBbg}</TableCell>
-                    <TableCell className="px-2 py-1 text-xs font-mono text-right text-emerald-700 font-medium">{formatPct(pos.positionAmount / summary.aum)}</TableCell>
-                    <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>{formatUsdK(pos.pnl || 0)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1.5">
-            <CardTitle className="font-serif text-base font-semibold">Top 10 Short</CardTitle>
-          </CardHeader>
-          <CardContent className="px-2 py-0">
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead className="w-6 px-2 text-xs">#</TableHead>
-                <TableHead className="px-2 text-xs">Company</TableHead>
-                <TableHead className="px-2 text-xs">Ticker</TableHead>
-                <TableHead className="px-2 text-xs text-right">Weight</TableHead>
-                <TableHead className="px-2 text-xs text-right">PNL</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {shortPositions.map((pos, idx) => (
-                  <TableRow key={pos.id} className="h-7">
-                    <TableCell className="px-2 py-1 text-xs text-[var(--muted-foreground)]">{idx + 1}</TableCell>
-                    <TableCell className="px-2 py-1 text-xs font-medium truncate max-w-[120px]">{pos.nameCn || pos.nameEn}</TableCell>
-                    <TableCell className="px-2 py-1 text-[11px] font-mono text-[var(--muted-foreground)]">{pos.tickerBbg}</TableCell>
-                    <TableCell className="px-2 py-1 text-xs font-mono text-right text-rose-700 font-medium">{formatPct(pos.positionAmount / summary.aum)}</TableCell>
-                    <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>{formatUsdK(pos.pnl || 0)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        {/* RIGHT: Linked Positions Table */}
+        <div className="w-[340px] flex-shrink-0">
+          <Card className="sticky top-0 h-[calc(100vh-200px)] flex flex-col">
+            <CardHeader className="px-3 py-2 border-b border-[var(--border)] flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <CardTitle className="font-serif text-sm font-semibold">
+                  {selectedCategory ? selectedCategory : "All Positions"}
+                </CardTitle>
+                {selectedCategory && (
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 rounded hover:bg-[var(--muted)]"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {selectedCategory && (
+                <p className="small-caps text-[0.5625rem] text-[var(--accent)] mt-0.5">
+                  {longPositions.length}L / {shortPositions.length}S
+                </p>
+              )}
+              {!selectedCategory && (
+                <p className="small-caps text-[0.5625rem] mt-0.5">
+                  {longPositions.length}L / {shortPositions.length}S · Click chart to filter
+                </p>
+              )}
+            </CardHeader>
+            <CardContent className="px-0 py-0 flex-1 overflow-y-auto">
+              {/* Long */}
+              {longPositions.length > 0 && (
+                <div>
+                  <div className="px-3 py-1.5 bg-emerald-50/50 border-b border-[var(--border)] sticky top-0">
+                    <span className="small-caps text-[0.5625rem] text-emerald-700">Long · {longPositions.length}</span>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
+                        <TableHead className="px-1.5 text-[10px]">Company</TableHead>
+                        <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
+                        <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
+                        <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {longPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {/* Short */}
+              {shortPositions.length > 0 && (
+                <div>
+                  <div className="px-3 py-1.5 bg-rose-50/50 border-b border-t border-[var(--border)] sticky top-0">
+                    <span className="small-caps text-[0.5625rem] text-rose-700">Short · {shortPositions.length}</span>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
+                        <TableHead className="px-1.5 text-[10px]">Company</TableHead>
+                        <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
+                        <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
+                        <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {shortPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {longPositions.length === 0 && shortPositions.length === 0 && (
+                <p className="text-xs text-[var(--muted-foreground)] py-8 text-center">No positions</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
