@@ -26,6 +26,8 @@ import {
   ResponsiveContainer,
   LabelList,
   Cell,
+  PieChart,
+  Pie,
 } from "recharts";
 import { Loader2, Pencil, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -41,27 +43,95 @@ function formatAum(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-type NetDimension = "region" | "industry" | "theme" | "riskCountry" | "gicIndustry" | "exchangeCountry";
+function formatUsdK(value: number): string {
+  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+}
 
-const NET_TABS: { key: NetDimension; label: string }[] = [
-  { key: "region", label: "Sector (Old)" },
-  { key: "industry", label: "Industry (Old)" },
-  { key: "theme", label: "Theme (Old)" },
+type Dimension = "riskCountry" | "gicIndustry" | "exchangeCountry";
+
+const DIM_TABS: { key: Dimension; label: string }[] = [
   { key: "riskCountry", label: "Risk Country" },
   { key: "gicIndustry", label: "GIC Industry" },
   { key: "exchangeCountry", label: "Exchange Country" },
 ];
 
+// Harmonious color palette for pie charts
+const PIE_COLORS = [
+  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#06b6d4", "#ec4899", "#14b8a6", "#f97316", "#6366f1",
+  "#84cc16", "#e11d48", "#0ea5e9", "#d946ef", "#22d3ee",
+  "#a3e635", "#fb923c", "#a78bfa", "#2dd4bf", "#fbbf24",
+];
+
+function DimensionTabs({ current, onChange }: { current: Dimension; onChange: (d: Dimension) => void }) {
+  return (
+    <div className="flex gap-1">
+      {DIM_TABS.map((tab) => (
+        <button
+          key={tab.key}
+          onClick={() => onChange(tab.key)}
+          className={`px-2.5 py-0.5 text-xs rounded-md transition-colors ${current === tab.key
+            ? "text-primary font-semibold"
+            : "text-muted-foreground hover:text-foreground"
+            }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function getDimData(summary: PortfolioSummary, dim: Dimension): SummaryByDimension[] {
+  return dim === "riskCountry" ? summary.byRiskCountry :
+    dim === "gicIndustry" ? summary.byGicIndustry :
+      summary.byExchangeCountry;
+}
+
+function getDimValue(p: PositionWithRelations, dim: Dimension): string {
+  if (dim === "riskCountry") return p.market || "其他";
+  if (dim === "gicIndustry") return p.gicIndustry || "其他";
+  return p.exchangeCountry || "其他";
+}
+
+// Custom pie label
+function renderPieLabel({ name, percent }: { name: string; percent: number }) {
+  if (percent < 0.03) return null; // skip tiny slices
+  return `${name} ${(percent * 100).toFixed(1)}%`;
+}
+
+// Custom tooltip for pie
+function PieTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0];
+  return (
+    <div className="rounded-md border bg-background p-2 text-xs shadow-md">
+      <p className="font-medium">{d.name}</p>
+      <p>{d.value.toFixed(1)}%</p>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [positions, setPositions] = useState<PositionWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const [netDim, setNetDim] = useState<NetDimension>("riskCountry");
-  const [selectedBar, setSelectedBar] = useState<string | null>(null);
 
-  // GMV States
-  const [gmvDim, setGmvDim] = useState<NetDimension>("riskCountry");
+  // NET/GMV dimension
+  const [netDim, setNetDim] = useState<Dimension>("riskCountry");
+  const [selectedBar, setSelectedBar] = useState<string | null>(null);
+  const [gmvDim, setGmvDim] = useState<Dimension>("riskCountry");
   const [selectedGmvBar, setSelectedGmvBar] = useState<string | null>(null);
+
+  // Pie chart dimension
+  const [netPieDim, setNetPieDim] = useState<Dimension>("riskCountry");
+  const [gmvPieDim, setGmvPieDim] = useState<Dimension>("riskCountry");
+
+  // PNL dimension
+  const [pnlDim, setPnlDim] = useState<Dimension>("riskCountry");
+  const [pnlPieDim, setPnlPieDim] = useState<Dimension>("riskCountry");
 
   const [editingAum, setEditingAum] = useState(false);
   const [aumInput, setAumInput] = useState("");
@@ -94,23 +164,13 @@ export default function DashboardPage() {
   }
 
   // Reset selection when dimension changes
-  useEffect(() => {
-    setSelectedBar(null);
-  }, [netDim]);
-  useEffect(() => {
-    setSelectedGmvBar(null);
-  }, [gmvDim]);
+  useEffect(() => { setSelectedBar(null); }, [netDim]);
+  useEffect(() => { setSelectedGmvBar(null); }, [gmvDim]);
 
+  // ===== NET data =====
   const netData = useMemo(() => {
     if (!summary) return [];
-    const source =
-      netDim === "region" ? summary.byRegion :
-        netDim === "industry" ? summary.byIndustry :
-          netDim === "theme" ? summary.byTheme :
-            netDim === "riskCountry" ? summary.byRiskCountry :
-              netDim === "gicIndustry" ? summary.byGicIndustry :
-                summary.byExchangeCountry;
-    return source
+    return getDimData(summary, netDim)
       .filter((d) => Math.abs(d.nmv) > 0.001)
       .sort((a, b) => b.nmv - a.nmv)
       .map((d) => ({
@@ -121,16 +181,10 @@ export default function DashboardPage() {
       }));
   }, [summary, netDim]);
 
+  // ===== GMV data =====
   const gmvData = useMemo(() => {
     if (!summary) return [];
-    const source =
-      gmvDim === "region" ? summary.byRegion :
-        gmvDim === "industry" ? summary.byIndustry :
-          gmvDim === "theme" ? summary.byTheme :
-            gmvDim === "riskCountry" ? summary.byRiskCountry :
-              gmvDim === "gicIndustry" ? summary.byGicIndustry :
-                summary.byExchangeCountry;
-    return source
+    return getDimData(summary, gmvDim)
       .filter((d) => Math.abs(d.gmv) > 0.001)
       .sort((a, b) => b.gmv - a.gmv)
       .map((d) => ({
@@ -141,52 +195,70 @@ export default function DashboardPage() {
       }));
   }, [summary, gmvDim]);
 
-  // Positions filtered by selected bar
+  // ===== PNL data =====
+  const pnlData = useMemo(() => {
+    if (!summary) return [];
+    return getDimData(summary, pnlDim)
+      .filter((d) => Math.abs(d.pnl) > 0.01)
+      .sort((a, b) => b.pnl - a.pnl)
+      .map((d) => ({
+        name: d.name,
+        pnl: Math.round(d.pnl),
+      }));
+  }, [summary, pnlDim]);
+
+  // ===== PIE data =====
+  const netPieData = useMemo(() => {
+    if (!summary) return [];
+    return getDimData(summary, netPieDim)
+      .filter(d => d.gmv > 0.001)
+      .sort((a, b) => b.gmv - a.gmv)
+      .map(d => ({ name: d.name, value: +(Math.abs(d.nmv) * 100).toFixed(1) }));
+  }, [summary, netPieDim]);
+
+  const gmvPieData = useMemo(() => {
+    if (!summary) return [];
+    return getDimData(summary, gmvPieDim)
+      .filter(d => d.gmv > 0.001)
+      .sort((a, b) => b.gmv - a.gmv)
+      .map(d => ({ name: d.name, value: +(d.gmv * 100).toFixed(1) }));
+  }, [summary, gmvPieDim]);
+
+  const pnlPieData = useMemo(() => {
+    if (!summary) return [];
+    return getDimData(summary, pnlPieDim)
+      .filter(d => Math.abs(d.pnl) > 0.01)
+      .sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl))
+      .map(d => ({ name: d.name, value: Math.round(Math.abs(d.pnl)) }));
+  }, [summary, pnlPieDim]);
+
+  // ===== Drill-down for NET =====
   const drillPositions = useMemo(() => {
     if (!selectedBar) return [];
     const active = positions.filter((p) => p.longShort === "long" || p.longShort === "short");
-    let filtered: PositionWithRelations[];
-    if (netDim === "region") {
-      filtered = active.filter((p) => (p.market || "其他") === selectedBar);
-    } else if (netDim === "industry") {
-      filtered = active.filter((p) => (p.sector?.name || "其他") === selectedBar);
-    } else if (netDim === "theme") {
-      filtered = active.filter((p) => (p.topdown?.name || "Others") === selectedBar);
-    } else if (netDim === "riskCountry") {
-      filtered = active.filter((p) => (p.market || "其他") === selectedBar);
-    } else if (netDim === "gicIndustry") {
-      filtered = active.filter((p) => (p.gicIndustry || "其他") === selectedBar);
-    } else {
-      filtered = active.filter((p) => (p.exchangeCountry || "其他") === selectedBar);
-    }
-    return filtered.sort((a, b) => {
-      if (a.longShort !== b.longShort) return a.longShort === "long" ? -1 : 1;
-      return b.positionAmount - a.positionAmount;
-    });
+    return active
+      .filter((p) => getDimValue(p, netDim) === selectedBar)
+      .sort((a, b) => {
+        if (a.longShort !== b.longShort) return a.longShort === "long" ? -1 : 1;
+        return b.positionAmount - a.positionAmount;
+      });
   }, [selectedBar, positions, netDim]);
 
+  // ===== Drill-down for GMV =====
   const drillGmvPositions = useMemo(() => {
     if (!selectedGmvBar) return [];
     const active = positions.filter((p) => p.longShort === "long" || p.longShort === "short");
-    let filtered: PositionWithRelations[];
-    if (gmvDim === "region") {
-      filtered = active.filter((p) => (p.market || "其他") === selectedGmvBar);
-    } else if (gmvDim === "industry") {
-      filtered = active.filter((p) => (p.sector?.name || "其他") === selectedGmvBar);
-    } else if (gmvDim === "theme") {
-      filtered = active.filter((p) => (p.topdown?.name || "Others") === selectedGmvBar);
-    } else if (gmvDim === "riskCountry") {
-      filtered = active.filter((p) => (p.market || "其他") === selectedGmvBar);
-    } else if (gmvDim === "gicIndustry") {
-      filtered = active.filter((p) => (p.gicIndustry || "其他") === selectedGmvBar);
-    } else {
-      filtered = active.filter((p) => (p.exchangeCountry || "其他") === selectedGmvBar);
-    }
-    return filtered.sort((a, b) => {
-      // For GMV drill, we still sort by amount but maybe absolute amount? Standard is absolute in GMV
-      return Math.abs(b.positionAmount) - Math.abs(a.positionAmount);
-    });
+    return active
+      .filter((p) => getDimValue(p, gmvDim) === selectedGmvBar)
+      .sort((a, b) => Math.abs(b.positionAmount) - Math.abs(a.positionAmount));
   }, [selectedGmvBar, positions, gmvDim]);
+
+  // ===== Calculate max Y-axis label width =====
+  function calcYAxisWidth(data: { name: string }[]) {
+    if (data.length === 0) return 60;
+    const maxLen = Math.max(...data.map(d => d.name.length));
+    return Math.min(Math.max(maxLen * 7, 60), 160);
+  }
 
   if (loading) {
     return (
@@ -210,8 +282,8 @@ export default function DashboardPage() {
     { label: "GMV%", value: formatPct(summary.gmv), color: "text-blue-600" },
     { label: "Long%", value: formatPct(summary.totalLong), color: "text-emerald-600" },
     { label: "Short%", value: formatPct(summary.totalShort), color: "text-rose-600" },
+    { label: "PNL", value: formatUsdK(summary.totalPnl || 0), color: (summary.totalPnl || 0) >= 0 ? "text-emerald-600" : "text-rose-600" },
   ];
-
 
   const longPositions = positions
     .filter((p) => p.longShort === "long")
@@ -223,13 +295,66 @@ export default function DashboardPage() {
     .sort((a, b) => b.positionAmount - a.positionAmount)
     .slice(0, 10);
 
-  // Handle bar click in Net Exposure chart
   function handleNetBarClick(data: { name: string }) {
     setSelectedBar((prev) => (prev === data.name ? null : data.name));
   }
-
   function handleGmvBarClick(data: { name: string }) {
     setSelectedGmvBar((prev) => (prev === data.name ? null : data.name));
+  }
+
+  // Drill-down table component
+  function DrillTable({ selected, data, onClose }: { selected: string; data: PositionWithRelations[]; onClose: () => void }) {
+    return (
+      <div className="mt-2 mb-2 mx-2 border rounded-md">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b">
+          <span className="text-xs font-medium">{selected} — {data.length} 个持仓</span>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {data.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-3 text-center">无持仓</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="px-2 text-xs">Company</TableHead>
+                <TableHead className="px-2 text-xs">Ticker</TableHead>
+                <TableHead className="px-2 text-xs">L/S</TableHead>
+                <TableHead className="px-2 text-xs text-right">Weight</TableHead>
+                <TableHead className="px-2 text-xs text-right">PNL</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((pos) => (
+                <TableRow key={pos.id} className="h-7">
+                  <TableCell className="px-2 py-1 text-xs font-medium truncate max-w-[140px]">
+                    {pos.nameCn || pos.nameEn}
+                  </TableCell>
+                  <TableCell className="px-2 py-1 text-[11px] font-mono text-muted-foreground">
+                    {pos.tickerBbg}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${pos.longShort === "long"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-rose-100 text-rose-700"
+                      }`}>
+                      {pos.longShort === "long" ? "L" : "S"}
+                    </span>
+                  </TableCell>
+                  <TableCell className={`px-2 py-1 text-xs font-mono text-right font-medium ${pos.longShort === "long" ? "text-emerald-600" : "text-rose-600"}`}>
+                    {formatPct(pos.positionAmount / summary.aum)}
+                  </TableCell>
+                  <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                    {formatUsdK(pos.pnl || 0)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -237,7 +362,7 @@ export default function DashboardPage() {
       <h1 className="text-xl font-bold">Dashboard</h1>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-6 gap-3">
         {statCards.map((card) => (
           <Card key={card.label} className="py-2">
             <CardContent className="px-4 py-0">
@@ -269,42 +394,24 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Exposure Distributions — Side by Side */}
+      {/* Bar Charts: Net Exposure & GMV */}
       <div className="grid grid-cols-2 gap-3">
-        {/* Net Exposure Distribution — with tabs and drill-down */}
+        {/* Net Exposure Bar Chart */}
         <Card className="py-2">
           <CardHeader className="px-4 py-1 flex flex-row items-center justify-between">
             <CardTitle className="text-sm">Net Exposure 分布</CardTitle>
-            <div className="flex gap-1">
-              {NET_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setNetDim(tab.key)}
-                  className={`px-2.5 py-0.5 text-xs rounded-md transition-colors ${netDim === tab.key
-                    ? "text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            <DimensionTabs current={netDim} onChange={setNetDim} />
           </CardHeader>
           <CardContent className="px-2 py-0">
             {netData.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p>
             ) : (
               <ResponsiveContainer width="100%" height={Math.max(120, netData.length * 28)}>
-                <BarChart
-                  data={netData}
-                  layout="vertical"
-                  margin={{ top: 2, right: 40, left: 4, bottom: 2 }}
-                >
+                <BarChart data={netData} layout="vertical" margin={{ top: 2, right: 40, left: 4, bottom: 2 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="name" width={56} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(netData)} tick={{ fontSize: 10 }} />
                   <Tooltip
-                    formatter={(value: any, name: any) => [`${Number(value).toFixed(1)}%`, name]}
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
@@ -319,128 +426,37 @@ export default function DashboardPage() {
                       );
                     }}
                   />
-                  <Bar
-                    dataKey="nmv"
-                    name="Net"
-                    barSize={14}
-                    radius={[0, 4, 4, 0]}
-                    cursor="pointer"
-                    onClick={(data: any) => handleNetBarClick(data)}
-                    isAnimationActive={false}
-                  >
+                  <Bar dataKey="nmv" name="Net" barSize={14} radius={[0, 4, 4, 0]} cursor="pointer"
+                    onClick={(data: any) => handleNetBarClick(data)} isAnimationActive={false}>
                     {netData.map((entry, index) => (
-                      <Cell
-                        key={index}
-                        fill={entry.nmv >= 0 ? "#10b981" : "#f43f5e"}
-                        opacity={selectedBar && selectedBar !== entry.name ? 0.3 : 1}
-                      />
+                      <Cell key={index} fill={entry.nmv >= 0 ? "#10b981" : "#f43f5e"}
+                        opacity={selectedBar && selectedBar !== entry.name ? 0.3 : 1} />
                     ))}
-                    <LabelList
-                      dataKey="nmv"
-                      position="right"
-                      formatter={(v: any) => `${v}%`}
-                      style={{ fontSize: 10, fill: "#666" }}
-                    />
+                    <LabelList dataKey="nmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 10, fill: "#666" }} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
-
-            {/* Drill-down position table */}
-            {selectedBar && (
-              <div className="mt-2 mb-2 mx-2 border rounded-md">
-                <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b">
-                  <span className="text-xs font-medium">
-                    {selectedBar} — {drillPositions.length} 个持仓
-                  </span>
-                  <button
-                    onClick={() => setSelectedBar(null)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                {drillPositions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-3 text-center">无持仓</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="px-2 text-xs">Company</TableHead>
-                        <TableHead className="px-2 text-xs">Ticker</TableHead>
-                        <TableHead className="px-2 text-xs">L/S</TableHead>
-                        <TableHead className="px-2 text-xs text-right">Weight</TableHead>
-                        <TableHead className="px-2 text-xs">Market</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {drillPositions.map((pos) => (
-                        <TableRow key={pos.id} className="h-7">
-                          <TableCell className="px-2 py-1 text-xs font-medium truncate max-w-[140px]">
-                            {pos.nameCn || pos.nameEn}
-                          </TableCell>
-                          <TableCell className="px-2 py-1 text-[11px] font-mono text-muted-foreground">
-                            {pos.tickerBbg}
-                          </TableCell>
-                          <TableCell className="px-2 py-1">
-                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${pos.longShort === "long"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-rose-100 text-rose-700"
-                              }`}>
-                              {pos.longShort === "long" ? "L" : "S"}
-                            </span>
-                          </TableCell>
-                          <TableCell className={`px-2 py-1 text-xs font-mono text-right font-medium ${pos.longShort === "long" ? "text-emerald-600" : "text-rose-600"
-                            }`}>
-                            {formatPct(pos.positionAmount / summary.aum)}
-                          </TableCell>
-                          <TableCell className="px-2 py-1 text-xs text-muted-foreground">
-                            {pos.market}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            )}
+            {selectedBar && <DrillTable selected={selectedBar} data={drillPositions} onClose={() => setSelectedBar(null)} />}
           </CardContent>
         </Card>
 
-        {/* Gross Exposure Distribution */}
+        {/* GMV Bar Chart */}
         <Card className="py-2">
           <CardHeader className="px-4 py-1 flex flex-row items-center justify-between">
             <CardTitle className="text-sm">Gross Exposure 分布 (GMV)</CardTitle>
-            <div className="flex gap-1">
-              {NET_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setGmvDim(tab.key)}
-                  className={`px-2.5 py-0.5 text-xs rounded-md transition-colors ${gmvDim === tab.key
-                    ? "text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            <DimensionTabs current={gmvDim} onChange={setGmvDim} />
           </CardHeader>
           <CardContent className="px-2 py-0">
             {gmvData.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p>
             ) : (
               <ResponsiveContainer width="100%" height={Math.max(120, gmvData.length * 28)}>
-                <BarChart
-                  data={gmvData}
-                  layout="vertical"
-                  margin={{ top: 2, right: 40, left: 4, bottom: 2 }}
-                >
+                <BarChart data={gmvData} layout="vertical" margin={{ top: 2, right: 40, left: 4, bottom: 2 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="name" width={56} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(gmvData)} tick={{ fontSize: 10 }} />
                   <Tooltip
-                    formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
@@ -455,96 +471,157 @@ export default function DashboardPage() {
                       );
                     }}
                   />
-                  <Bar
-                    dataKey="gmv"
-                    name="Gross"
-                    barSize={14}
-                    radius={[0, 4, 4, 0]}
-                    cursor="pointer"
-                    onClick={(data: any) => handleGmvBarClick(data)}
-                    isAnimationActive={false}
-                  >
+                  <Bar dataKey="gmv" name="Gross" barSize={14} radius={[0, 4, 4, 0]} cursor="pointer"
+                    onClick={(data: any) => handleGmvBarClick(data)} isAnimationActive={false}>
                     {gmvData.map((entry, index) => (
-                      <Cell
-                        key={index}
-                        fill="#3b82f6"
-                        opacity={selectedGmvBar && selectedGmvBar !== entry.name ? 0.3 : 1}
-                      />
+                      <Cell key={index} fill="#3b82f6"
+                        opacity={selectedGmvBar && selectedGmvBar !== entry.name ? 0.3 : 1} />
                     ))}
-                    <LabelList
-                      dataKey="gmv"
-                      position="right"
-                      formatter={(v: any) => `${v}%`}
-                      style={{ fontSize: 10, fill: "#666" }}
-                    />
+                    <LabelList dataKey="gmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 10, fill: "#666" }} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
+            {selectedGmvBar && <DrillTable selected={selectedGmvBar} data={drillGmvPositions} onClose={() => setSelectedGmvBar(null)} />}
+          </CardContent>
+        </Card>
+      </div>
 
-            {/* Drill-down position table */}
-            {selectedGmvBar && (
-              <div className="mt-2 mb-2 mx-2 border rounded-md">
-                <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b">
-                  <span className="text-xs font-medium">
-                    {selectedGmvBar} — {drillGmvPositions.length} 个持仓
-                  </span>
-                  <button
-                    onClick={() => setSelectedGmvBar(null)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                {drillGmvPositions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-3 text-center">无持仓</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="px-2 text-xs">Company</TableHead>
-                        <TableHead className="px-2 text-xs">Ticker</TableHead>
-                        <TableHead className="px-2 text-xs">L/S</TableHead>
-                        <TableHead className="px-2 text-xs text-right">Weight</TableHead>
-                        <TableHead className="px-2 text-xs">Market</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {drillGmvPositions.map((pos) => (
-                        <TableRow key={pos.id} className="h-7">
-                          <TableCell className="px-2 py-1 text-xs font-medium truncate max-w-[140px]">
-                            {pos.nameCn || pos.nameEn}
-                          </TableCell>
-                          <TableCell className="px-2 py-1 text-[11px] font-mono text-muted-foreground">
-                            {pos.tickerBbg}
-                          </TableCell>
-                          <TableCell className="px-2 py-1">
-                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${pos.longShort === "long"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-rose-100 text-rose-700"
-                              }`}>
-                              {pos.longShort === "long" ? "L" : "S"}
-                            </span>
-                          </TableCell>
-                          <TableCell className={`px-2 py-1 text-xs font-mono text-right font-medium ${pos.longShort === "long" ? "text-emerald-600" : "text-rose-600"
-                            }`}>
-                            {formatPct(pos.positionAmount / summary.aum)}
-                          </TableCell>
-                          <TableCell className="px-2 py-1 text-xs text-muted-foreground">
-                            {pos.market}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
+      {/* Pie Charts: NET Distribution & GMV Distribution */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="py-2">
+          <CardHeader className="px-4 py-1 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">NET 分布 (饼图)</CardTitle>
+            <DimensionTabs current={netPieDim} onChange={setNetPieDim} />
+          </CardHeader>
+          <CardContent className="px-2 py-0">
+            {netPieData.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={netPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
+                    label={renderPieLabel} labelLine={true} isAnimationActive={false}>
+                    {netPieData.map((_, index) => (
+                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<PieTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="py-2">
+          <CardHeader className="px-4 py-1 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">GMV 分布 (饼图)</CardTitle>
+            <DimensionTabs current={gmvPieDim} onChange={setGmvPieDim} />
+          </CardHeader>
+          <CardContent className="px-2 py-0">
+            {gmvPieData.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={gmvPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
+                    label={renderPieLabel} labelLine={true} isAnimationActive={false}>
+                    {gmvPieData.map((_, index) => (
+                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<PieTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Top Positions — two tables side by side */}
+      {/* PNL Section */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* PNL Bar Chart */}
+        <Card className="py-2">
+          <CardHeader className="px-4 py-1 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">PNL 分布 (条形图)</CardTitle>
+            <DimensionTabs current={pnlDim} onChange={setPnlDim} />
+          </CardHeader>
+          <CardContent className="px-2 py-0">
+            {pnlData.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">暂无 PNL 数据 (请确认 Excel 中包含 PNL 列)</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={Math.max(120, pnlData.length * 28)}>
+                <BarChart data={pnlData} layout="vertical" margin={{ top: 2, right: 50, left: 4, bottom: 2 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tickFormatter={(v) => formatUsdK(v)} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(pnlData)} tick={{ fontSize: 10 }} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload;
+                      return (
+                        <div className="rounded-md border bg-background p-2 text-xs shadow-md">
+                          <p className="font-medium mb-1">{label}</p>
+                          <p>PNL: <span className={d.pnl >= 0 ? "text-emerald-600" : "text-rose-600"}>{formatUsdK(d.pnl)}</span></p>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar dataKey="pnl" name="PNL" barSize={14} radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                    {pnlData.map((entry, index) => (
+                      <Cell key={index} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                    ))}
+                    <LabelList dataKey="pnl" position="right" formatter={(v: any) => formatUsdK(v)} style={{ fontSize: 10, fill: "#666" }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* PNL Pie Chart */}
+        <Card className="py-2">
+          <CardHeader className="px-4 py-1 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">PNL 分布 (饼图)</CardTitle>
+            <DimensionTabs current={pnlPieDim} onChange={setPnlPieDim} />
+          </CardHeader>
+          <CardContent className="px-2 py-0">
+            {pnlPieData.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">暂无 PNL 数据</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={pnlPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
+                    label={({ name, value }) => {
+                      const total = pnlPieData.reduce((s, d) => s + d.value, 0);
+                      const pct = total > 0 ? (value / total * 100).toFixed(1) : "0";
+                      return `${name} ${formatUsdK(value)} (${pct}%)`;
+                    }}
+                    labelLine={true} isAnimationActive={false}>
+                    {pnlPieData.map((_, index) => (
+                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0];
+                      return (
+                        <div className="rounded-md border bg-background p-2 text-xs shadow-md">
+                          <p className="font-medium">{d.name}</p>
+                          <p>{formatUsdK(d.value as number)}</p>
+                        </div>
+                      );
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Positions */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="py-2">
           <CardHeader className="px-4 py-1">
@@ -558,6 +635,7 @@ export default function DashboardPage() {
                   <TableHead className="px-2 text-xs">Company</TableHead>
                   <TableHead className="px-2 text-xs">Ticker</TableHead>
                   <TableHead className="px-2 text-xs text-right">Weight</TableHead>
+                  <TableHead className="px-2 text-xs text-right">PNL</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -570,6 +648,9 @@ export default function DashboardPage() {
                     <TableCell className="px-2 py-1 text-[11px] font-mono text-muted-foreground">{pos.tickerBbg}</TableCell>
                     <TableCell className="px-2 py-1 text-xs font-mono text-right text-emerald-600 font-medium">
                       {formatPct(pos.positionAmount / summary.aum)}
+                    </TableCell>
+                    <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                      {formatUsdK(pos.pnl || 0)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -590,6 +671,7 @@ export default function DashboardPage() {
                   <TableHead className="px-2 text-xs">Company</TableHead>
                   <TableHead className="px-2 text-xs">Ticker</TableHead>
                   <TableHead className="px-2 text-xs text-right">Weight</TableHead>
+                  <TableHead className="px-2 text-xs text-right">PNL</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -602,6 +684,9 @@ export default function DashboardPage() {
                     <TableCell className="px-2 py-1 text-[11px] font-mono text-muted-foreground">{pos.tickerBbg}</TableCell>
                     <TableCell className="px-2 py-1 text-xs font-mono text-right text-rose-600 font-medium">
                       {formatPct(pos.positionAmount / summary.aum)}
+                    </TableCell>
+                    <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                      {formatUsdK(pos.pnl || 0)}
                     </TableCell>
                   </TableRow>
                 ))}

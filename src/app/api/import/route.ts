@@ -26,6 +26,21 @@ export async function POST(request: NextRequest) {
     // This prevents ghost positions (sold stocks not in the new file) from accumulating and causing duplicate calculations.
     run(`UPDATE Position SET longShort = '/', positionAmount = 0, positionWeight = 0 WHERE longShort IN ('long', 'short')`);
 
+    // Debug: capture the actual column headers from Excel
+    const excelColumns = rows.length > 0 ? Object.keys(rows[0]) : [];
+    const debugSamples: { ticker: string; gic: string; exchange: string; risk: string }[] = [];
+
+    // Helper: find a column value by case-insensitive substring match on the key
+    function findColumn(row: Record<string, unknown>, ...keywords: string[]): string {
+      for (const key of Object.keys(row)) {
+        const lk = key.toLowerCase().trim();
+        if (keywords.every(kw => lk.includes(kw.toLowerCase()))) {
+          return String(row[key] ?? "").trim();
+        }
+      }
+      return "";
+    }
+
     let total = 0;
     let matched = 0;
     let created = 0;
@@ -33,17 +48,24 @@ export async function POST(request: NextRequest) {
     const unmatched: { bbgName: string }[] = [];
 
     for (const row of rows) {
-      const bbgName = String(row["Underlying_Description"] ?? "").trim();
-      const tickerBbg = String(row["BB Yellow Key"] ?? "").trim();
-      const riskCountry = String(row["First Risk Country"] ?? "").trim();
-      const gicIndustry = String(row["First GIC industry"] ?? "").trim();
-      const exchangeCountry = String(row["First exchange country"] ?? "").trim();
+      const bbgName = findColumn(row, "underlying") || String(row["Underlying_Description"] ?? "").trim();
+      const tickerBbg = findColumn(row, "yellow key") || findColumn(row, "bb yellow") || String(row["BB Yellow Key"] ?? "").trim();
+      const riskCountry = findColumn(row, "risk country");
+      const gicIndustry = findColumn(row, "gic", "industry");
+      const exchangeCountry = findColumn(row, "exchange", "country");
+      const pnlRaw = findColumn(row, "pnl") || findColumn(row, "p&l") || findColumn(row, "unrealized");
+      const pnl = parseFloat(pnlRaw.replace(/,/g, '')) || 0;
 
       // Skip empty rows, "Total" summary rows, and the grand total row
       if (!tickerBbg || tickerBbg === "Total") continue;
       if (bbgName === "Total" || bbgName.startsWith("Applied filters")) continue;
 
       total++;
+
+      // Collect debug samples (first 3 rows) to verify column matching
+      if (debugSamples.length < 3) {
+        debugSamples.push({ ticker: tickerBbg, gic: gicIndustry, exchange: exchangeCountry, risk: riskCountry });
+      }
 
       // STRICTLY use Latest NMV. 
       // Many times Excel column headers have hidden spaces like "Latest NMV " or " Latest NMV".
@@ -89,8 +111,8 @@ export async function POST(request: NextRequest) {
       run(
         `INSERT INTO Position (
            tickerBbg, nameEn, nameCn, market, longShort, positionAmount, positionWeight, 
-           gicIndustry, exchangeCountry, createdAt, updatedAt
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+           gicIndustry, exchangeCountry, pnl, createdAt, updatedAt
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
          ON CONFLICT(tickerBbg) DO UPDATE SET
            nameEn = excluded.nameEn,
            nameCn = excluded.nameCn,
@@ -100,10 +122,11 @@ export async function POST(request: NextRequest) {
            positionWeight = excluded.positionWeight,
            gicIndustry = excluded.gicIndustry,
            exchangeCountry = excluded.exchangeCountry,
+           pnl = excluded.pnl,
            updatedAt = datetime('now')`,
         [
           tickerBbg, bbgName, chineseName, market, longShort, positionAmount, positionWeight,
-          gicIndustry, exchangeCountry
+          gicIndustry, exchangeCountry, pnl
         ]
       );
       // We assume it's an update for logic simplicity, though it could be new
@@ -116,7 +139,7 @@ export async function POST(request: NextRequest) {
       ["positions", file.name, total, created, updated]
     );
 
-    return NextResponse.json({ total, matched, unmatched, created, updated });
+    return NextResponse.json({ total, matched, unmatched, created, updated, excelColumns, debugSamples });
   } catch (error) {
     console.error("Failed to import positions:", error);
     return NextResponse.json(

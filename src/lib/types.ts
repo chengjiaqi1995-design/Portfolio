@@ -24,6 +24,7 @@ export interface PositionWithRelations {
   topdown: TaxonomyItem | null;
   gicIndustry?: string;
   exchangeCountry?: string;
+  pnl?: number;
 }
 
 export interface TaxonomyItem {
@@ -46,20 +47,19 @@ export interface SummaryByDimension {
   short: number;
   nmv: number;
   gmv: number;
+  pnl: number;
 }
 
 export interface PortfolioSummary {
   aum: number;
   totalLong: number;
   totalShort: number;
+  totalPnl: number;
   nmv: number;
   gmv: number;
   longCount: number;
   shortCount: number;
   watchlistCount: number;
-  byRegion: SummaryByDimension[]; // Deprecated, kept for backward comp
-  byIndustry: SummaryByDimension[]; // Deprecated
-  byTheme: SummaryByDimension[]; // Deprecated
   byRiskCountry: SummaryByDimension[];
   byGicIndustry: SummaryByDimension[];
   byExchangeCountry: SummaryByDimension[];

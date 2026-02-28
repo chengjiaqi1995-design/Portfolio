@@ -33,6 +33,7 @@ function runMigrations(db: Database.Database) {
   const migrations: { column: string; type: string; defaultVal: string }[] = [
     { column: "gicIndustry", type: "TEXT", defaultVal: "''" },
     { column: "exchangeCountry", type: "TEXT", defaultVal: "''" },
+    { column: "pnl", type: "REAL", defaultVal: "0" },
   ];
 
   for (const m of migrations) {
@@ -97,6 +98,7 @@ export interface PositionRow {
   updatedAt: string;
   gicIndustry: string;
   exchangeCountry: string;
+  pnl: number;
   // Joined fields
   sectorName?: string;
   themeName?: string;
@@ -242,6 +244,7 @@ export function toPositionWithRelations(row: PositionRow) {
     topdown: makeTaxonomy(row.topdownId, row.topdownName, "topdown"),
     gicIndustry: row.gicIndustry,
     exchangeCountry: row.exchangeCountry,
+    pnl: row.pnl,
   };
 }
 
@@ -261,6 +264,7 @@ export interface SummaryByDimension {
   short: number;
   nmv: number;
   gmv: number;
+  pnl: number;
 }
 
 export function getPortfolioSummary() {
@@ -276,6 +280,7 @@ export function getPortfolioSummary() {
   // --- Step 1: Merge positions by company (nameEn) ---
   const companyMap = new Map<string, {
     signedNmv: number;
+    pnl: number;
     market: string;
     sectorName: string;
     topdownName: string;
@@ -290,6 +295,7 @@ export function getPortfolioSummary() {
     if (companyMap.has(key)) {
       const existing = companyMap.get(key)!;
       existing.signedNmv += signedNmv;
+      existing.pnl += (p.pnl || 0);
       // Keep first non-empty values for dimensions
       if (!existing.market && p.market) existing.market = p.market;
       if (!existing.sectorName && p.sectorName) existing.sectorName = p.sectorName;
@@ -299,6 +305,7 @@ export function getPortfolioSummary() {
     } else {
       companyMap.set(key, {
         signedNmv,
+        pnl: p.pnl || 0,
         market: p.market || "",
         sectorName: p.sectorName || "",
         topdownName: p.topdownName || "",
@@ -311,12 +318,10 @@ export function getPortfolioSummary() {
   // --- Step 2: Aggregate on merged companies ---
   let totalLong = 0;
   let totalShort = 0;
+  let totalPnl = 0;
   let longCount = 0;
   let shortCount = 0;
 
-  const byRegionMap = new Map<string, SummaryByDimension>();
-  const byIndustryMap = new Map<string, SummaryByDimension>();
-  const byThemeMap = new Map<string, SummaryByDimension>();
   const byRiskCountryMap = new Map<string, SummaryByDimension>();
   const byGicIndustryMap = new Map<string, SummaryByDimension>();
   const byExchangeCountryMap = new Map<string, SummaryByDimension>();
@@ -324,6 +329,9 @@ export function getPortfolioSummary() {
   for (const [, company] of companyMap) {
     const isLong = company.signedNmv >= 0;
     const weight = Math.abs(company.signedNmv) / AUM;
+    const pnl = company.pnl;
+
+    totalPnl += pnl;
 
     if (isLong) {
       totalLong += weight;
@@ -335,19 +343,15 @@ export function getPortfolioSummary() {
 
     // Helper to add to a dimension map
     const addToDim = (map: Map<string, SummaryByDimension>, dimName: string) => {
-      if (!map.has(dimName)) map.set(dimName, { name: dimName, long: 0, short: 0, nmv: 0, gmv: 0 });
+      if (!map.has(dimName)) map.set(dimName, { name: dimName, long: 0, short: 0, nmv: 0, gmv: 0, pnl: 0 });
       const d = map.get(dimName)!;
       if (isLong) d.long += weight; else d.short -= weight;
       d.nmv = d.long + d.short;
       d.gmv = d.long + Math.abs(d.short);
+      d.pnl += pnl;
     };
 
-    // Old Taxonomy Dimensions
-    addToDim(byRegionMap, company.market || "其他");
-    addToDim(byIndustryMap, company.sectorName || "其他");
-    addToDim(byThemeMap, company.topdownName || "Others");
-
-    // New Native Dimensions
+    // Native Dimensions
     addToDim(byRiskCountryMap, company.market || "其他");
     addToDim(byGicIndustryMap, company.gicIndustry || "其他");
     addToDim(byExchangeCountryMap, company.exchangeCountry || "其他");
@@ -357,14 +361,12 @@ export function getPortfolioSummary() {
     aum: AUM,
     totalLong,
     totalShort,
+    totalPnl,
     nmv: totalLong + totalShort,
     gmv: totalLong + Math.abs(totalShort),
     longCount,
     shortCount,
     watchlistCount,
-    byRegion: [...byRegionMap.values()].sort((a, b) => b.gmv - a.gmv),
-    byIndustry: [...byIndustryMap.values()].sort((a, b) => b.gmv - a.gmv),
-    byTheme: [...byThemeMap.values()].sort((a, b) => b.gmv - a.gmv),
     byRiskCountry: [...byRiskCountryMap.values()].sort((a, b) => b.gmv - a.gmv),
     byGicIndustry: [...byGicIndustryMap.values()].sort((a, b) => b.gmv - a.gmv),
     byExchangeCountry: [...byExchangeCountryMap.values()].sort((a, b) => b.gmv - a.gmv),
