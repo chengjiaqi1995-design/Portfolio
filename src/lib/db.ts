@@ -322,6 +322,9 @@ export function getPortfolioSummary() {
   let longCount = 0;
   let shortCount = 0;
 
+  const bySectorMap = new Map<string, SummaryByDimension>();
+  const byIndustryMap = new Map<string, SummaryByDimension>();
+  const byThemeMap = new Map<string, SummaryByDimension>();
   const byRiskCountryMap = new Map<string, SummaryByDimension>();
   const byGicIndustryMap = new Map<string, SummaryByDimension>();
   const byExchangeCountryMap = new Map<string, SummaryByDimension>();
@@ -351,6 +354,11 @@ export function getPortfolioSummary() {
       d.pnl += pnl;
     };
 
+    // Taxonomy Dimensions
+    addToDim(bySectorMap, company.market || "其他");
+    addToDim(byIndustryMap, company.sectorName || "其他");
+    addToDim(byThemeMap, company.topdownName || "Others");
+
     // Native Dimensions
     addToDim(byRiskCountryMap, company.market || "其他");
     addToDim(byGicIndustryMap, company.gicIndustry || "其他");
@@ -367,6 +375,9 @@ export function getPortfolioSummary() {
     longCount,
     shortCount,
     watchlistCount,
+    bySector: [...bySectorMap.values()].sort((a, b) => b.gmv - a.gmv),
+    byIndustry: [...byIndustryMap.values()].sort((a, b) => b.gmv - a.gmv),
+    byTheme: [...byThemeMap.values()].sort((a, b) => b.gmv - a.gmv),
     byRiskCountry: [...byRiskCountryMap.values()].sort((a, b) => b.gmv - a.gmv),
     byGicIndustry: [...byGicIndustryMap.values()].sort((a, b) => b.gmv - a.gmv),
     byExchangeCountry: [...byExchangeCountryMap.values()].sort((a, b) => b.gmv - a.gmv),

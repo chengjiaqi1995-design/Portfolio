@@ -60,6 +60,9 @@ export interface PortfolioSummary {
   longCount: number;
   shortCount: number;
   watchlistCount: number;
+  bySector: SummaryByDimension[];
+  byIndustry: SummaryByDimension[];
+  byTheme: SummaryByDimension[];
   byRiskCountry: SummaryByDimension[];
   byGicIndustry: SummaryByDimension[];
   byExchangeCountry: SummaryByDimension[];

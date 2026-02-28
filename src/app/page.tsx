@@ -49,9 +49,12 @@ function formatUsdK(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-type Dimension = "riskCountry" | "gicIndustry" | "exchangeCountry";
+type Dimension = "sector" | "industry" | "theme" | "riskCountry" | "gicIndustry" | "exchangeCountry";
 
 const DIM_TABS: { key: Dimension; label: string }[] = [
+  { key: "sector", label: "Sector" },
+  { key: "industry", label: "Industry" },
+  { key: "theme", label: "Theme" },
   { key: "riskCountry", label: "Risk Country" },
   { key: "gicIndustry", label: "GIC Industry" },
   { key: "exchangeCountry", label: "Exchange Country" },
@@ -85,20 +88,26 @@ function DimensionTabs({ current, onChange }: { current: Dimension; onChange: (d
 }
 
 function getDimData(summary: PortfolioSummary, dim: Dimension): SummaryByDimension[] {
-  return dim === "riskCountry" ? summary.byRiskCountry :
-    dim === "gicIndustry" ? summary.byGicIndustry :
-      summary.byExchangeCountry;
+  if (dim === "sector") return summary.bySector;
+  if (dim === "industry") return summary.byIndustry;
+  if (dim === "theme") return summary.byTheme;
+  if (dim === "riskCountry") return summary.byRiskCountry;
+  if (dim === "gicIndustry") return summary.byGicIndustry;
+  return summary.byExchangeCountry;
 }
 
 function getDimValue(p: PositionWithRelations, dim: Dimension): string {
+  if (dim === "sector") return p.market || "其他";
+  if (dim === "industry") return p.sector?.name || "其他";
+  if (dim === "theme") return p.topdown?.name || "Others";
   if (dim === "riskCountry") return p.market || "其他";
   if (dim === "gicIndustry") return p.gicIndustry || "其他";
   return p.exchangeCountry || "其他";
 }
 
 // Custom pie label
-function renderPieLabel({ name, percent }: { name: string; percent: number }) {
-  if (percent < 0.03) return null; // skip tiny slices
+function renderPieLabel({ name, percent }: any) {
+  if (percent < 0.03) return null;
   return `${name} ${(percent * 100).toFixed(1)}%`;
 }
 
@@ -343,7 +352,7 @@ export default function DashboardPage() {
                     </span>
                   </TableCell>
                   <TableCell className={`px-2 py-1 text-xs font-mono text-right font-medium ${pos.longShort === "long" ? "text-emerald-600" : "text-rose-600"}`}>
-                    {formatPct(pos.positionAmount / summary.aum)}
+                    {formatPct(pos.positionAmount / (summary?.aum || 1))}
                   </TableCell>
                   <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                     {formatUsdK(pos.pnl || 0)}
