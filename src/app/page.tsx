@@ -28,15 +28,15 @@ import {
 } from "recharts";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import * as echarts from "echarts/core";
-import { PieChart as EChartsPieChart } from "echarts/charts";
-import { TooltipComponent, LegendComponent } from "echarts/components";
+import { PieChart as EChartsPieChart, ScatterChart as EChartsScatterChart } from "echarts/charts";
+import { TooltipComponent, LegendComponent, GridComponent } from "echarts/components";
 import { LabelLayout } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
 import { Loader2, Pencil, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { PortfolioSummary, PositionWithRelations, SummaryByDimension } from "@/lib/types";
 
-echarts.use([EChartsPieChart, TooltipComponent, LegendComponent, LabelLayout, CanvasRenderer]);
+echarts.use([EChartsPieChart, EChartsScatterChart, TooltipComponent, LegendComponent, GridComponent, LabelLayout, CanvasRenderer]);
 
 function formatPct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
@@ -172,6 +172,55 @@ function calcYAxisWidth(data: { name: string }[]) {
   return Math.min(Math.max(maxLen * 7, 60), 130);
 }
 
+// ===== ECharts Scatter — GMV vs PNL =====
+function EChartsScatter({ data, height = 220 }: {
+  data: { name: string; gmv: number; pnl: number; isLong: boolean }[];
+  height?: number;
+}) {
+  const option = {
+    grid: { top: 20, right: 20, bottom: 35, left: 55 },
+    tooltip: {
+      trigger: "item",
+      backgroundColor: "#FFFFFF",
+      borderColor: "#E8E4DF",
+      borderWidth: 1,
+      textStyle: { color: "#1A1A1A", fontSize: 11 },
+      formatter: (params: any) => {
+        const d = params.data;
+        return `<b>${d[2]}</b><br/>GMV: ${formatUsdK(d[0])}<br/>PNL: <span style="color:${d[1] >= 0 ? '#2D6A4F' : '#C0392B'}">${formatUsdK(d[1])}</span>`;
+      },
+    },
+    xAxis: {
+      type: "value",
+      name: "GMV",
+      nameTextStyle: { fontSize: 9, color: "#6B6B6B" },
+      axisLabel: { fontSize: 8, color: "#6B6B6B", formatter: (v: number) => formatUsdK(v) },
+      splitLine: { lineStyle: { color: "#E8E4DF", type: "dashed" } },
+    },
+    yAxis: {
+      type: "value",
+      name: "PNL",
+      nameTextStyle: { fontSize: 9, color: "#6B6B6B" },
+      axisLabel: { fontSize: 8, color: "#6B6B6B", formatter: (v: number) => formatUsdK(v) },
+      splitLine: { lineStyle: { color: "#E8E4DF", type: "dashed" } },
+    },
+    series: [{
+      type: "scatter",
+      symbolSize: 8,
+      data: data.map(d => ({
+        value: [d.gmv, d.pnl, d.name, d.isLong],
+        itemStyle: { color: d.isLong ? "#2D6A4F" : "#C0392B", opacity: 0.7 },
+      })),
+    }],
+  };
+
+  return (
+    <ReactEChartsCore echarts={echarts} option={option}
+      style={{ height, width: "100%" }}
+      opts={{ renderer: "canvas" }} notMerge={true} />
+  );
+}
+
 export default function DashboardPage() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [positions, setPositions] = useState<PositionWithRelations[]>([]);
@@ -252,8 +301,24 @@ export default function DashboardPage() {
 
   // Linked positions table — filtered by selected category
   const activePositions = useMemo(() => {
-    return positions.filter(p => p.longShort === "long" || p.longShort === "short");
+    return positions.filter(p => (p.longShort === "long" || p.longShort === "short") && p.positionAmount > 0);
   }, [positions]);
+
+  // Scatter plot data: all positions
+  const scatterAllData = useMemo(() =>
+    activePositions.map(p => ({
+      name: p.nameCn || p.nameEn,
+      gmv: p.positionAmount,
+      pnl: p.pnl || 0,
+      isLong: p.longShort === "long",
+    })),
+    [activePositions]);
+
+  // Scatter plot data: filtered by current dimension's categories
+  const scatterDimData = useMemo(() => {
+    if (!selectedCategory) return scatterAllData;
+    return scatterAllData.filter((_, i) => getDimValue(activePositions[i], dim) === selectedCategory);
+  }, [scatterAllData, activePositions, selectedCategory, dim]);
 
   const filteredPositions = useMemo(() => {
     if (!selectedCategory) return activePositions;
@@ -476,6 +541,28 @@ export default function DashboardPage() {
               <CardContent className="px-1 py-0">
                 {pnlPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No PNL data</p> :
                   <EChartsPie data={pnlPieData} formatter={formatUsdK} height={barHeight(pnlData)} selected={selectedCategory} onSelect={toggleCategory} />}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Scatter plots row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">GMV vs PNL — All</CardTitle></CardHeader>
+              <CardContent className="px-1 py-0">
+                {scatterAllData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> :
+                  <EChartsScatter data={scatterAllData} height={260} />}
+              </CardContent>
+            </Card>
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1">
+                <CardTitle className="font-serif text-sm font-semibold">
+                  GMV vs PNL{selectedCategory ? ` — ${selectedCategory}` : ` — by ${DIM_TABS.find(d => d.key === dim)?.label}`}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-1 py-0">
+                {scatterDimData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> :
+                  <EChartsScatter data={scatterDimData} height={260} />}
               </CardContent>
             </Card>
           </div>

@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
         existing.tickerBbg = existing.tickerBbg + " / " + pos.tickerBbg;
         existing.positionAmount = Math.abs(mergedNmv);
-        existing.longShort = mergedNmv >= 0 ? "long" : "short";
+        existing.longShort = mergedNmv > 0 ? "long" : mergedNmv < 0 ? "short" : "/";
         existing.positionWeight = existing.positionAmount; // Will be recalculated by frontend
 
         // Keep first non-null taxonomy assignments
