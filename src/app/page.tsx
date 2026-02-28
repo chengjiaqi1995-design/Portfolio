@@ -357,13 +357,12 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Row 1: Three Bar Charts */}
-      <div className="grid grid-cols-3 gap-3">
-        {/* Net Exposure Bar Chart */}
+      {/* Row 1: NET — Bar + Pie */}
+      <div className="grid grid-cols-2 gap-3">
         <Card className="py-2">
           <CardHeader className="px-4 py-1"><CardTitle className="text-sm">Net Exposure</CardTitle></CardHeader>
           <CardContent className="px-1 py-0">
-            {netData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p> : (
+            {netData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No data</p> : (
               <ResponsiveContainer width="100%" height={barHeight(netData)}>
                 <BarChart data={netData} layout="vertical" margin={{ top: 2, right: 35, left: 2, bottom: 2 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -392,12 +391,20 @@ export default function DashboardPage() {
             {selectedNetBar && <DrillTable selected={selectedNetBar} data={drillNetPositions} onClose={() => setSelectedNetBar(null)} />}
           </CardContent>
         </Card>
-
-        {/* GMV Bar Chart */}
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">Gross Exposure (GMV)</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">NET Distribution</CardTitle></CardHeader>
           <CardContent className="px-1 py-0">
-            {gmvData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p> : (
+            {netPieData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No data</p> : <EChartsPie data={netPieData} />}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 2: GMV — Bar + Pie */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="py-2">
+          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">Gross Exposure</CardTitle></CardHeader>
+          <CardContent className="px-1 py-0">
+            {gmvData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No data</p> : (
               <ResponsiveContainer width="100%" height={barHeight(gmvData)}>
                 <BarChart data={gmvData} layout="vertical" margin={{ top: 2, right: 35, left: 2, bottom: 2 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -426,12 +433,20 @@ export default function DashboardPage() {
             {selectedGmvBar && <DrillTable selected={selectedGmvBar} data={drillGmvPositions} onClose={() => setSelectedGmvBar(null)} />}
           </CardContent>
         </Card>
-
-        {/* PNL Bar Chart */}
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">PNL 分布</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">GMV Distribution</CardTitle></CardHeader>
           <CardContent className="px-1 py-0">
-            {pnlData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">暂无 PNL 数据</p> : (
+            {gmvPieData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No data</p> : <EChartsPie data={gmvPieData} />}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 3: PNL — Bar + Pie */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="py-2">
+          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">PNL Breakdown</CardTitle></CardHeader>
+          <CardContent className="px-1 py-0">
+            {pnlData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No PNL data</p> : (
               <ResponsiveContainer width="100%" height={barHeight(pnlData)}>
                 <BarChart data={pnlData} layout="vertical" margin={{ top: 2, right: 45, left: 2, bottom: 2 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -454,26 +469,10 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {/* Row 2: Three Pie Charts */}
-      <div className="grid grid-cols-3 gap-3">
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">NET 分布</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">PNL Distribution</CardTitle></CardHeader>
           <CardContent className="px-1 py-0">
-            {netPieData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p> : <EChartsPie data={netPieData} />}
-          </CardContent>
-        </Card>
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">GMV 分布</CardTitle></CardHeader>
-          <CardContent className="px-1 py-0">
-            {gmvPieData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p> : <EChartsPie data={gmvPieData} />}
-          </CardContent>
-        </Card>
-        <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">PNL 分布</CardTitle></CardHeader>
-          <CardContent className="px-1 py-0">
-            {pnlPieData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">暂无 PNL 数据</p> : <EChartsPie data={pnlPieData} formatter={formatUsdK} />}
+            {pnlPieData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No PNL data</p> : <EChartsPie data={pnlPieData} formatter={formatUsdK} />}
           </CardContent>
         </Card>
       </div>

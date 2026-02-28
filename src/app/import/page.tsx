@@ -124,15 +124,9 @@ function DropZone({
 }
 
 export default function ImportPage() {
-  const [positionPreview, setPositionPreview] = useState<ImportPreview | null>(
-    null
-  );
-  const [marketCapPreview, setMarketCapPreview] =
-    useState<ImportPreview | null>(null);
+  const [positionPreview, setPositionPreview] = useState<ImportPreview | null>(null);
   const [positionLoading, setPositionLoading] = useState(false);
-  const [marketCapLoading, setMarketCapLoading] = useState(false);
   const [positionAccepted, setPositionAccepted] = useState(false);
-  const [marketCapAccepted, setMarketCapAccepted] = useState(false);
 
   // Name mapping edits for unmatched
   const [nameMappings, setNameMappings] = useState<NameMappingEntry[]>([]);
@@ -145,7 +139,6 @@ export default function ImportPage() {
 
   // Upload file references
   const [positionFile, setPositionFile] = useState<File | null>(null);
-  const [marketCapFile, setMarketCapFile] = useState<File | null>(null);
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -194,30 +187,6 @@ export default function ImportPage() {
       toast.error("文件解析失败");
     } finally {
       setPositionLoading(false);
-    }
-  }
-
-  async function handleMarketCapFile(file: File) {
-    setMarketCapFile(file);
-    setMarketCapLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", "market_cap");
-      formData.append("preview", "true");
-
-      const res = await fetch("/api/import", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error("Preview failed");
-      const preview: ImportPreview = await res.json();
-      setMarketCapPreview(preview);
-      setMarketCapAccepted(true);
-    } catch {
-      toast.error("文件解析失败");
-    } finally {
-      setMarketCapLoading(false);
     }
   }
 
@@ -317,27 +286,10 @@ export default function ImportPage() {
         if (!res.ok) throw new Error("Import failed");
       }
 
-      // Confirm market cap import
-      if (marketCapFile) {
-        const formData = new FormData();
-        formData.append("file", marketCapFile);
-        formData.append("type", "market_cap");
-        formData.append("confirm", "true");
-
-        const res = await fetch("/api/import", {
-          method: "POST",
-          body: formData,
-        });
-        if (!res.ok) throw new Error("Import failed");
-      }
-
       toast.success("导入成功!");
       setPositionPreview(null);
-      setMarketCapPreview(null);
       setPositionAccepted(false);
-      setMarketCapAccepted(false);
       setPositionFile(null);
-      setMarketCapFile(null);
       setNameMappings([]);
       fetchHistory();
     } catch {
@@ -352,7 +304,7 @@ export default function ImportPage() {
       <h1 className="text-2xl font-bold">数据导入</h1>
 
       {/* Drop Zones */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-1">
         <DropZone
           title="导入持仓数据"
           description="上传 Bloomberg Export Excel 文件"
@@ -360,17 +312,10 @@ export default function ImportPage() {
           loading={positionLoading}
           accepted={positionAccepted}
         />
-        <DropZone
-          title="刷新市值数据"
-          description="上传市值数据 Excel 文件"
-          onFile={handleMarketCapFile}
-          loading={marketCapLoading}
-          accepted={marketCapAccepted}
-        />
       </div>
 
       {/* Preview Section */}
-      {(positionPreview || marketCapPreview) && (
+      {positionPreview && (
         <Card>
           <CardHeader>
             <CardTitle>导入预览</CardTitle>
@@ -400,34 +345,6 @@ export default function ImportPage() {
                       <span className="text-muted-foreground">未匹配:</span>{" "}
                       <span className="font-mono font-medium text-rose-600">
                         {positionPreview.unmatchedCount}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {marketCapPreview && (
-                <div className="rounded-lg border p-4 space-y-2">
-                  <h3 className="font-medium flex items-center gap-2">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    市值数据
-                  </h3>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">总记录:</span>{" "}
-                      <span className="font-mono font-medium">
-                        {marketCapPreview.totalRecords}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">已匹配:</span>{" "}
-                      <span className="font-mono font-medium text-emerald-600">
-                        {marketCapPreview.matchedCount}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">未匹配:</span>{" "}
-                      <span className="font-mono font-medium text-rose-600">
-                        {marketCapPreview.unmatchedCount}
                       </span>
                     </div>
                   </div>

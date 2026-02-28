@@ -388,7 +388,6 @@ export default function PositionsPage() {
                 )}
               </span>
             </TableHead>
-            <TableHead className="text-right px-1">MCap(亿)</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -543,11 +542,6 @@ export default function PositionsPage() {
               {/* Position% */}
               <TableCell className="text-right font-mono text-sm px-1">
                 {formatPct(pos.positionAmount / aum)}
-              </TableCell>
-
-              {/* MarketCap */}
-              <TableCell className="text-right font-mono text-sm px-1">
-                {formatMarketCap(pos.marketCapRmb)}
               </TableCell>
             </TableRow>
           ))}
@@ -742,10 +736,6 @@ export default function PositionsPage() {
                 <div>
                   <span className="text-muted-foreground">Market:</span>{" "}
                   {selectedPosition.market}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">MarketCap:</span>{" "}
-                  {formatMarketCap(selectedPosition.marketCapRmb)}亿
                 </div>
                 <div>
                   <span className="text-muted-foreground">PE 2026:</span>{" "}
