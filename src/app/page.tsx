@@ -22,16 +22,21 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   LabelList,
   Cell,
-  PieChart,
-  Pie,
 } from "recharts";
+import ReactEChartsCore from "echarts-for-react/lib/core";
+import * as echarts from "echarts/core";
+import { PieChart as EChartsPieChart } from "echarts/charts";
+import { TooltipComponent, LegendComponent } from "echarts/components";
+import { LabelLayout } from "echarts/features";
+import { CanvasRenderer } from "echarts/renderers";
 import { Loader2, Pencil, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { PortfolioSummary, PositionWithRelations, SummaryByDimension } from "@/lib/types";
+
+echarts.use([EChartsPieChart, TooltipComponent, LegendComponent, LabelLayout, CanvasRenderer]);
 
 function formatPct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
@@ -105,21 +110,54 @@ function getDimValue(p: PositionWithRelations, dim: Dimension): string {
   return p.exchangeCountry || "其他";
 }
 
-// Custom pie label
-function renderPieLabel({ name, percent }: any) {
-  if (percent < 0.03) return null;
-  return `${name} ${(percent * 100).toFixed(1)}%`;
-}
-
-// Custom tooltip for pie
-function PieTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0];
+// ECharts pie component
+function EChartsPie({ data, formatter }: { data: { name: string; value: number }[]; formatter?: (value: number) => string }) {
+  const option = {
+    tooltip: {
+      trigger: "item",
+      formatter: (params: any) => {
+        const pct = params.percent.toFixed(1);
+        const val = formatter ? formatter(params.value) : `${params.value}%`;
+        return `<b>${params.name}</b><br/>${val} (${pct}%)`;
+      },
+    },
+    legend: {
+      type: "scroll",
+      orient: "vertical",
+      right: 0,
+      top: "middle",
+      textStyle: { fontSize: 11 },
+      formatter: (name: string) => name.length > 14 ? name.slice(0, 14) + "\u2026" : name,
+    },
+    series: [{
+      type: "pie",
+      radius: ["25%", "60%"],
+      center: ["35%", "50%"],
+      avoidLabelOverlap: true,
+      itemStyle: { borderRadius: 4, borderColor: "#fff", borderWidth: 2 },
+      label: {
+        show: true,
+        formatter: (params: any) => {
+          if (params.percent < 3) return "";
+          const val = formatter ? formatter(params.value) : `${params.value}%`;
+          return `{name|${params.name}}\n{val|${val}}`;
+        },
+        rich: {
+          name: { fontSize: 11, color: "#333" },
+          val: { fontSize: 10, color: "#999", lineHeight: 16 },
+        },
+      },
+      labelLine: { show: true, length: 8, length2: 12 },
+      emphasis: {
+        label: { show: true, fontSize: 13, fontWeight: "bold" },
+        itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,0.15)" },
+      },
+      data: data.map((d, i) => ({ ...d, itemStyle: { color: PIE_COLORS[i % PIE_COLORS.length] } })),
+    }],
+  };
   return (
-    <div className="rounded-md border bg-background p-2 text-xs shadow-md">
-      <p className="font-medium">{d.name}</p>
-      <p>{d.value.toFixed(1)}%</p>
-    </div>
+    <ReactEChartsCore echarts={echarts} option={option}
+      style={{ height: 300, width: "100%" }} opts={{ renderer: "canvas" }} notMerge={true} />
   );
 }
 
@@ -507,17 +545,7 @@ export default function DashboardPage() {
             {netPieData.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={netPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
-                    label={renderPieLabel} labelLine={true} isAnimationActive={false}>
-                    {netPieData.map((_, index) => (
-                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<PieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
+              <EChartsPie data={netPieData} />
             )}
           </CardContent>
         </Card>
@@ -531,17 +559,7 @@ export default function DashboardPage() {
             {gmvPieData.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">暂无数据</p>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={gmvPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
-                    label={renderPieLabel} labelLine={true} isAnimationActive={false}>
-                    {gmvPieData.map((_, index) => (
-                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<PieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
+              <EChartsPie data={gmvPieData} />
             )}
           </CardContent>
         </Card>
@@ -598,33 +616,7 @@ export default function DashboardPage() {
             {pnlPieData.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">暂无 PNL 数据</p>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={pnlPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
-                    label={({ name, value }) => {
-                      const total = pnlPieData.reduce((s, d) => s + d.value, 0);
-                      const pct = total > 0 ? (value / total * 100).toFixed(1) : "0";
-                      return `${name} ${formatUsdK(value)} (${pct}%)`;
-                    }}
-                    labelLine={true} isAnimationActive={false}>
-                    {pnlPieData.map((_, index) => (
-                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0];
-                      return (
-                        <div className="rounded-md border bg-background p-2 text-xs shadow-md">
-                          <p className="font-medium">{d.name}</p>
-                          <p>{formatUsdK(d.value as number)}</p>
-                        </div>
-                      );
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <EChartsPie data={pnlPieData} formatter={formatUsdK} />
             )}
           </CardContent>
         </Card>
