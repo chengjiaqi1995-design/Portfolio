@@ -481,80 +481,84 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* RIGHT: Linked Positions Table — Long & Short side by side */}
+        {/* RIGHT: Linked Positions Table — single card, Long & Short side by side */}
         <div className="flex-1 min-w-0">
-          <div className="sticky top-0">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h2 className="font-serif text-sm font-semibold">
-                  {selectedCategory ? selectedCategory : "All Positions"}
-                </h2>
-                <p className="small-caps text-[0.5625rem] mt-0.5 {selectedCategory ? 'text-[var(--accent)]' : ''}">
-                  {longPositions.length}L / {shortPositions.length}S{!selectedCategory && ' · Click chart to filter'}
-                </p>
+          <Card className="sticky top-0 flex flex-col" style={{ maxHeight: "calc(100vh - 200px)" }}>
+            {/* Card Header: title + stats + clear */}
+            <CardHeader className="px-4 py-2 border-b border-[var(--border)] flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="font-serif text-sm font-semibold">
+                    {selectedCategory ? selectedCategory : "All Positions"}
+                  </CardTitle>
+                  <p className={`small-caps text-[0.5625rem] mt-0.5 ${selectedCategory ? 'text-[var(--accent)]' : ''}`}>
+                    {longPositions.length}L / {shortPositions.length}S{!selectedCategory && ' · Click chart to filter'}
+                  </p>
+                </div>
+                {selectedCategory && (
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 rounded hover:bg-[var(--muted)]"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-              {selectedCategory && (
-                <button
-                  onClick={() => setSelectedCategory(null)}
-                  className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 rounded hover:bg-[var(--muted)]"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-            {/* Side-by-side Long / Short */}
-            <div className="grid grid-cols-2 gap-3" style={{ maxHeight: "calc(100vh - 240px)" }}>
-              {/* Long */}
-              <Card className="py-1.5 overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 240px)" }}>
-                <CardHeader className="px-3 py-1 border-b border-[var(--border)] flex-shrink-0">
-                  <CardTitle className="font-serif text-sm font-semibold text-emerald-700">Long · {longPositions.length}</CardTitle>
-                </CardHeader>
-                <CardContent className="px-0 py-0 flex-1 overflow-y-auto">
-                  {longPositions.length === 0 ? (
-                    <p className="text-xs text-[var(--muted-foreground)] py-6 text-center">No longs</p>
-                  ) : (
-                    <Table>
-                      <TableHeader><TableRow>
-                        <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
-                        <TableHead className="px-1.5 text-[10px]">Company</TableHead>
-                        <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
-                        <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
-                        <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
-                      </TableRow></TableHeader>
-                      <TableBody>
-                        {longPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-              {/* Short */}
-              <Card className="py-1.5 overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 240px)" }}>
-                <CardHeader className="px-3 py-1 border-b border-[var(--border)] flex-shrink-0">
-                  <CardTitle className="font-serif text-sm font-semibold text-rose-700">Short · {shortPositions.length}</CardTitle>
-                </CardHeader>
-                <CardContent className="px-0 py-0 flex-1 overflow-y-auto">
-                  {shortPositions.length === 0 ? (
-                    <p className="text-xs text-[var(--muted-foreground)] py-6 text-center">No shorts</p>
-                  ) : (
-                    <Table>
-                      <TableHeader><TableRow>
-                        <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
-                        <TableHead className="px-1.5 text-[10px]">Company</TableHead>
-                        <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
-                        <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
-                        <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
-                      </TableRow></TableHeader>
-                      <TableBody>
-                        {shortPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+            </CardHeader>
+            {/* Card Body: two columns */}
+            <CardContent className="px-0 py-0 flex-1 overflow-hidden">
+              <div className="grid grid-cols-2 h-full">
+                {/* Long column */}
+                <div className="border-r border-[var(--border)] flex flex-col overflow-hidden">
+                  <div className="px-3 py-1.5 border-b border-[var(--border)] flex-shrink-0 bg-emerald-50/30">
+                    <span className="small-caps text-[0.5625rem] text-emerald-700">Long · {longPositions.length}</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    {longPositions.length === 0 ? (
+                      <p className="text-xs text-[var(--muted-foreground)] py-6 text-center">No longs</p>
+                    ) : (
+                      <Table>
+                        <TableHeader><TableRow>
+                          <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
+                          <TableHead className="px-1.5 text-[10px]">Company</TableHead>
+                          <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
+                          <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
+                          <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
+                        </TableRow></TableHeader>
+                        <TableBody>
+                          {longPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </div>
+                {/* Short column */}
+                <div className="flex flex-col overflow-hidden">
+                  <div className="px-3 py-1.5 border-b border-[var(--border)] flex-shrink-0 bg-rose-50/30">
+                    <span className="small-caps text-[0.5625rem] text-rose-700">Short · {shortPositions.length}</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    {shortPositions.length === 0 ? (
+                      <p className="text-xs text-[var(--muted-foreground)] py-6 text-center">No shorts</p>
+                    ) : (
+                      <Table>
+                        <TableHeader><TableRow>
+                          <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
+                          <TableHead className="px-1.5 text-[10px]">Company</TableHead>
+                          <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
+                          <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
+                          <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
+                        </TableRow></TableHeader>
+                        <TableBody>
+                          {shortPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
