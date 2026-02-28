@@ -90,10 +90,10 @@ function DropZone({
   return (
     <div
       className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors cursor-pointer ${dragOver
-          ? "border-primary bg-primary/5"
-          : accepted
-            ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/10"
-            : "border-muted-foreground/25 hover:border-muted-foreground/50"
+        ? "border-primary bg-primary/5"
+        : accepted
+          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/10"
+          : "border-muted-foreground/25 hover:border-muted-foreground/50"
         }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -563,7 +563,7 @@ export default function ImportPage() {
                       {item.updatedCount}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(item.createdAt).toLocaleString("zh-CN")}
+                      {new Date(item.createdAt.endsWith("Z") ? item.createdAt : item.createdAt + "Z").toLocaleString("zh-CN", { timeZone: "Asia/Hong_Kong" })}
                     </TableCell>
                   </TableRow>
                 ))}
