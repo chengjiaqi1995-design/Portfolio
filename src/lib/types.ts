@@ -22,6 +22,8 @@ export interface PositionWithRelations {
   sector: TaxonomyItem | null;
   theme: TaxonomyItem | null;
   topdown: TaxonomyItem | null;
+  gicIndustry?: string;
+  exchangeCountry?: string;
 }
 
 export interface TaxonomyItem {
@@ -55,9 +57,12 @@ export interface PortfolioSummary {
   longCount: number;
   shortCount: number;
   watchlistCount: number;
-  byRegion: SummaryByDimension[];
-  byIndustry: SummaryByDimension[];
-  byTheme: SummaryByDimension[];
+  byRegion: SummaryByDimension[]; // Deprecated, kept for backward comp
+  byIndustry: SummaryByDimension[]; // Deprecated
+  byTheme: SummaryByDimension[]; // Deprecated
+  byRiskCountry: SummaryByDimension[];
+  byGicIndustry: SummaryByDimension[];
+  byExchangeCountry: SummaryByDimension[];
 }
 
 export interface TradeItemInput {

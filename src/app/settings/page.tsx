@@ -337,6 +337,12 @@ export default function SettingsPage() {
   const [nameMappings, setNameMappings] = useState<NameMapping[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // AI Settings
+  const [aiBaseUrl, setAiBaseUrl] = useState("");
+  const [aiModel, setAiModel] = useState("");
+  const [aiApiKey, setAiApiKey] = useState("");
+  const [savingAi, setSavingAi] = useState(false);
+
   // Name mapping dialog
   const [mappingDialogOpen, setMappingDialogOpen] = useState(false);
   const [editMapping, setEditMapping] = useState<NameMapping | null>(null);
@@ -346,16 +352,22 @@ export default function SettingsPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [topdownRes, sectorRes, themeRes, mappingRes] = await Promise.all([
+      const [topdownRes, sectorRes, themeRes, mappingRes, settingsRes] = await Promise.all([
         fetch("/api/taxonomy?type=topdown"),
         fetch("/api/taxonomy?type=sector"),
         fetch("/api/taxonomy?type=theme"),
         fetch("/api/name-mappings"),
+        fetch("/api/settings"),
       ]);
       setTopdowns(await topdownRes.json());
       setSectors(await sectorRes.json());
       setThemes(await themeRes.json());
       setNameMappings(await mappingRes.json());
+
+      const settings = await settingsRes.json();
+      if (settings.ai_base_url) setAiBaseUrl(settings.ai_base_url);
+      if (settings.ai_model) setAiModel(settings.ai_model);
+      if (settings.ai_api_key) setAiApiKey(settings.ai_api_key);
     } catch {
       toast.error("加载设置失败");
     } finally {
@@ -432,6 +444,27 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleSaveAiSettings() {
+    setSavingAi(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ai_base_url: aiBaseUrl.trim(),
+          ai_model: aiModel.trim(),
+          ai_api_key: aiApiKey.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("AI 配置保存成功");
+    } catch {
+      toast.error("保存失败");
+    } finally {
+      setSavingAi(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -443,6 +476,51 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">设置</h1>
+
+      {/* AI Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>AI 模型配置</CardTitle>
+          <CardDescription>
+            配置用于“AI自动填表”功能的大语言模型 API (兼容 OpenAI 格式)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>API Base URL</Label>
+              <Input
+                value={aiBaseUrl}
+                onChange={(e) => setAiBaseUrl(e.target.value)}
+                placeholder="https://api.openai.com/v1 或者第三方代理地址"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>模型名称 (Model)</Label>
+              <Input
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                placeholder="gpt-4o, deepseek-chat 等"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>API Key</Label>
+            <Input
+              value={aiApiKey}
+              onChange={(e) => setAiApiKey(e.target.value)}
+              placeholder="sk-..."
+              type="password"
+            />
+          </div>
+          <Button onClick={handleSaveAiSettings} disabled={savingAi}>
+            {savingAi && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            保存配置
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Separator />
 
       {/* Taxonomy Sections */}
       <div className="grid gap-6">

@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Plus, Search, FileText } from "lucide-react";
+import { Loader2, Plus, Search, FileText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { PositionWithRelations } from "@/lib/types";
 
@@ -89,6 +89,9 @@ export default function ResearchPage() {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [newPositionId, setNewPositionId] = useState<string>("");
   const [creating, setCreating] = useState(false);
+
+  // AI Fill
+  const [aiFilling, setAiFilling] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -182,6 +185,38 @@ export default function ResearchPage() {
     }
   }
 
+  async function handleAiFill() {
+    if (!selected) return;
+    setAiFilling(true);
+    const toastId = toast.loading("AI 正在分析公司基本面，请稍候...");
+    try {
+      const res = await fetch("/api/ai/fill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          positionId: selected.positionId,
+          researchId: selected.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "请求失败");
+
+      toast.success("AI 填表完成", { id: toastId });
+
+      // Update local state with the newly generated parsed data
+      const newFields = data.parsed;
+      setSelected((prev) => prev ? { ...prev, ...newFields } : null);
+      setResearchList((prev) =>
+        prev.map((r) => (r.id === selected.id ? { ...r, ...newFields } : r))
+      );
+
+    } catch (err: any) {
+      toast.error(err.message, { id: toastId });
+    } finally {
+      setAiFilling(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -226,11 +261,10 @@ export default function ResearchPage() {
               filteredList.map((r) => (
                 <div
                   key={r.id}
-                  className={`cursor-pointer rounded-md px-3 py-2 transition-colors ${
-                    selected?.id === r.id
+                  className={`cursor-pointer rounded-md px-3 py-2 transition-colors ${selected?.id === r.id
                       ? "bg-accent text-accent-foreground"
                       : "hover:bg-muted"
-                  }`}
+                    }`}
                   onClick={() => setSelected(r)}
                 >
                   <div className="text-sm font-medium">
@@ -243,16 +277,16 @@ export default function ResearchPage() {
                         r.position.longShort === "long"
                           ? "default"
                           : r.position.longShort === "short"
-                          ? "destructive"
-                          : "secondary"
+                            ? "destructive"
+                            : "secondary"
                       }
                       className="text-[10px] h-4"
                     >
                       {r.position.longShort === "long"
                         ? "L"
                         : r.position.longShort === "short"
-                        ? "S"
-                        : "/"}
+                          ? "S"
+                          : "/"}
                     </Badge>
                   </div>
                 </div>
@@ -275,10 +309,26 @@ export default function ResearchPage() {
           <ScrollArea className="h-full">
             <div className="p-6 space-y-6">
               {/* Position info header */}
-              <div className="space-y-2">
-                <h2 className="text-xl font-bold">
-                  {selected.position.nameCn || selected.position.nameEn}
-                </h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold">
+                    {selected.position.nameCn || selected.position.nameEn}
+                  </h2>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleAiFill}
+                    disabled={aiFilling}
+                    className="bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200"
+                  >
+                    {aiFilling ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    AI 自动填表
+                  </Button>
+                </div>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                   <span className="font-mono">
                     {selected.position.tickerBbg}
@@ -298,8 +348,8 @@ export default function ResearchPage() {
                       selected.position.longShort === "long"
                         ? "default"
                         : selected.position.longShort === "short"
-                        ? "destructive"
-                        : "secondary"
+                          ? "destructive"
+                          : "secondary"
                     }
                   >
                     {selected.position.longShort.toUpperCase()}

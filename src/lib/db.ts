@@ -1,8 +1,8 @@
 import Database from "better-sqlite3";
 import path from "path";
 
-// Database file is at project root (where prisma config puts it)
-const dbPath = path.join(process.cwd(), "dev.db");
+// Database file can be overridden via DB_PATH (e.g. /mnt/data/dev.db) for Cloud Run volume mounts
+const dbPath = process.env.DB_PATH || path.join(process.cwd(), "dev.db");
 
 let _db: Database.Database | null = null;
 
@@ -19,8 +19,27 @@ export function getDb(): Database.Database {
       )
     `);
     _db.prepare("INSERT OR IGNORE INTO AppSettings (key, value) VALUES ('aum', '10000000')").run();
+
+    // Robust column migration: check existence first, then add
+    runMigrations(_db);
   }
   return _db;
+}
+
+function runMigrations(db: Database.Database) {
+  const cols = db.pragma("table_info(Position)") as { name: string }[];
+  const existingCols = new Set(cols.map((c) => c.name));
+
+  const migrations: { column: string; type: string; defaultVal: string }[] = [
+    { column: "gicIndustry", type: "TEXT", defaultVal: "''" },
+    { column: "exchangeCountry", type: "TEXT", defaultVal: "''" },
+  ];
+
+  for (const m of migrations) {
+    if (!existingCols.has(m.column)) {
+      db.exec(`ALTER TABLE Position ADD COLUMN ${m.column} ${m.type} DEFAULT ${m.defaultVal}`);
+    }
+  }
 }
 
 export function getAum(): number {
@@ -76,6 +95,8 @@ export interface PositionRow {
   marketCapDate: string | null;
   createdAt: string;
   updatedAt: string;
+  gicIndustry: string;
+  exchangeCountry: string;
   // Joined fields
   sectorName?: string;
   themeName?: string;
@@ -219,6 +240,8 @@ export function toPositionWithRelations(row: PositionRow) {
     sector: makeTaxonomy(row.sectorId, row.sectorName, "sector"),
     theme: makeTaxonomy(row.themeId, row.themeName, "theme"),
     topdown: makeTaxonomy(row.topdownId, row.topdownName, "topdown"),
+    gicIndustry: row.gicIndustry,
+    exchangeCountry: row.exchangeCountry,
   };
 }
 
@@ -243,61 +266,91 @@ export interface SummaryByDimension {
 export function getPortfolioSummary() {
   const AUM = getAum();
 
-  const activePositions = queryAll<PositionRow>(
-    "SELECT * FROM Position WHERE longShort IN ('long', 'short')"
-  );
-
-  let totalLong = 0;
-  let totalShort = 0;
-  let longCount = 0;
-  let shortCount = 0;
   const watchlistCount = queryOne<{ c: number }>("SELECT COUNT(*) as c FROM Position WHERE longShort = '/'")?.c || 0;
-
-  const byRegionMap = new Map<string, SummaryByDimension>();
-  const byIndustryMap = new Map<string, SummaryByDimension>();
-  const byThemeMap = new Map<string, SummaryByDimension>();
 
   // Get taxonomy names for each position
   const positionsWithNames = queryAll<PositionRow>(
     POSITIONS_SELECT + " WHERE p.longShort IN ('long', 'short')"
   );
 
-  for (const p of positionsWithNames) {
-    const weight = p.positionAmount / AUM;
+  // --- Step 1: Merge positions by company (nameEn) ---
+  const companyMap = new Map<string, {
+    signedNmv: number;
+    market: string;
+    sectorName: string;
+    topdownName: string;
+    gicIndustry: string;
+    exchangeCountry: string;
+  }>();
 
-    if (p.longShort === "long") {
+  for (const p of positionsWithNames) {
+    const key = p.nameEn || p.tickerBbg; // fallback to ticker if no name
+    const signedNmv = p.longShort === "long" ? p.positionAmount : -p.positionAmount;
+
+    if (companyMap.has(key)) {
+      const existing = companyMap.get(key)!;
+      existing.signedNmv += signedNmv;
+      // Keep first non-empty values for dimensions
+      if (!existing.market && p.market) existing.market = p.market;
+      if (!existing.sectorName && p.sectorName) existing.sectorName = p.sectorName;
+      if (!existing.topdownName && p.topdownName) existing.topdownName = p.topdownName;
+      if (!existing.gicIndustry && p.gicIndustry) existing.gicIndustry = p.gicIndustry;
+      if (!existing.exchangeCountry && p.exchangeCountry) existing.exchangeCountry = p.exchangeCountry;
+    } else {
+      companyMap.set(key, {
+        signedNmv,
+        market: p.market || "",
+        sectorName: p.sectorName || "",
+        topdownName: p.topdownName || "",
+        gicIndustry: p.gicIndustry || "",
+        exchangeCountry: p.exchangeCountry || "",
+      });
+    }
+  }
+
+  // --- Step 2: Aggregate on merged companies ---
+  let totalLong = 0;
+  let totalShort = 0;
+  let longCount = 0;
+  let shortCount = 0;
+
+  const byRegionMap = new Map<string, SummaryByDimension>();
+  const byIndustryMap = new Map<string, SummaryByDimension>();
+  const byThemeMap = new Map<string, SummaryByDimension>();
+  const byRiskCountryMap = new Map<string, SummaryByDimension>();
+  const byGicIndustryMap = new Map<string, SummaryByDimension>();
+  const byExchangeCountryMap = new Map<string, SummaryByDimension>();
+
+  for (const [, company] of companyMap) {
+    const isLong = company.signedNmv >= 0;
+    const weight = Math.abs(company.signedNmv) / AUM;
+
+    if (isLong) {
       totalLong += weight;
       longCount++;
     } else {
-      totalShort -= Math.abs(weight); // short is negative
+      totalShort -= weight; // short is negative
       shortCount++;
     }
 
-    const signedWeight = p.longShort === "long" ? weight : -Math.abs(weight);
+    // Helper to add to a dimension map
+    const addToDim = (map: Map<string, SummaryByDimension>, dimName: string) => {
+      if (!map.has(dimName)) map.set(dimName, { name: dimName, long: 0, short: 0, nmv: 0, gmv: 0 });
+      const d = map.get(dimName)!;
+      if (isLong) d.long += weight; else d.short -= weight;
+      d.nmv = d.long + d.short;
+      d.gmv = d.long + Math.abs(d.short);
+    };
 
-    // By region
-    const region = p.market || "其他";
-    if (!byRegionMap.has(region)) byRegionMap.set(region, { name: region, long: 0, short: 0, nmv: 0, gmv: 0 });
-    const r = byRegionMap.get(region)!;
-    if (p.longShort === "long") r.long += weight; else r.short -= Math.abs(weight);
-    r.nmv = r.long + r.short;
-    r.gmv = r.long + Math.abs(r.short);
+    // Old Taxonomy Dimensions
+    addToDim(byRegionMap, company.market || "其他");
+    addToDim(byIndustryMap, company.sectorName || "其他");
+    addToDim(byThemeMap, company.topdownName || "Others");
 
-    // By industry (sector)
-    const sector = p.sectorName || "其他";
-    if (!byIndustryMap.has(sector)) byIndustryMap.set(sector, { name: sector, long: 0, short: 0, nmv: 0, gmv: 0 });
-    const s = byIndustryMap.get(sector)!;
-    if (p.longShort === "long") s.long += weight; else s.short -= Math.abs(weight);
-    s.nmv = s.long + s.short;
-    s.gmv = s.long + Math.abs(s.short);
-
-    // By theme (topdown)
-    const theme = p.topdownName || "Others";
-    if (!byThemeMap.has(theme)) byThemeMap.set(theme, { name: theme, long: 0, short: 0, nmv: 0, gmv: 0 });
-    const t = byThemeMap.get(theme)!;
-    if (p.longShort === "long") t.long += weight; else t.short -= Math.abs(weight);
-    t.nmv = t.long + t.short;
-    t.gmv = t.long + Math.abs(t.short);
+    // New Native Dimensions
+    addToDim(byRiskCountryMap, company.market || "其他");
+    addToDim(byGicIndustryMap, company.gicIndustry || "其他");
+    addToDim(byExchangeCountryMap, company.exchangeCountry || "其他");
   }
 
   return {
@@ -312,5 +365,8 @@ export function getPortfolioSummary() {
     byRegion: [...byRegionMap.values()].sort((a, b) => b.gmv - a.gmv),
     byIndustry: [...byIndustryMap.values()].sort((a, b) => b.gmv - a.gmv),
     byTheme: [...byThemeMap.values()].sort((a, b) => b.gmv - a.gmv),
+    byRiskCountry: [...byRiskCountryMap.values()].sort((a, b) => b.gmv - a.gmv),
+    byGicIndustry: [...byGicIndustryMap.values()].sort((a, b) => b.gmv - a.gmv),
+    byExchangeCountry: [...byExchangeCountryMap.values()].sort((a, b) => b.gmv - a.gmv),
   };
 }

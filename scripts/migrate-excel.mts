@@ -15,6 +15,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// @ts-ignore - Ignore type error for PrismaClient instantiation during build
 const prisma = new PrismaClient();
 
 // ======== 分类数据 (从Excel中提取) ========
@@ -248,7 +249,7 @@ async function main() {
           let nameCn = company;
           for (const [key, value] of Object.entries(NAME_MAPPINGS)) {
             if (nameEn.toUpperCase().includes(key.toUpperCase()) ||
-                company.toUpperCase().includes(key.toUpperCase())) {
+              company.toUpperCase().includes(key.toUpperCase())) {
               nameCn = value;
               break;
             }

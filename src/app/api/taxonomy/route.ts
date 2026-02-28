@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const result = run(
-      "INSERT INTO Taxonomy (type, name, parentId, sortOrder) VALUES (?, ?, ?, ?)",
+      "INSERT INTO Taxonomy (type, name, parentId, sortOrder, createdAt, updatedAt) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))",
       [body.type, body.name, body.parentId ?? null, body.sortOrder ?? 0]
     );
 

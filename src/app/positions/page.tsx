@@ -97,6 +97,14 @@ export default function PositionsPage() {
   const [newTaxName, setNewTaxName] = useState("");
   const [creatingTax, setCreatingTax] = useState(false);
 
+  // Rename taxonomy dialog state
+  const [renameTaxDialog, setRenameTaxDialog] = useState<{
+    open: boolean;
+    item: TaxonomyItem | null;
+  }>({ open: false, item: null });
+  const [renameTaxName, setRenameTaxName] = useState("");
+  const [renamingTax, setRenamingTax] = useState(false);
+
   async function handleCreateTaxonomy() {
     if (!newTaxName.trim() || !newTaxDialog.pos) return;
     setCreatingTax(true);
@@ -124,6 +132,33 @@ export default function PositionsPage() {
       toast.error("创建失败");
     } finally {
       setCreatingTax(false);
+    }
+  }
+
+  async function handleRenameTaxonomy() {
+    if (!renameTaxName.trim() || !renameTaxDialog.item) return;
+    setRenamingTax(true);
+    try {
+      const res = await fetch(`/api/taxonomy/${renameTaxDialog.item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: renameTaxName.trim() }),
+      });
+      if (!res.ok) throw new Error("Rename failed");
+      toast.success("重命名成功");
+
+      // Refresh taxonomy list and positions
+      const taxRes = await fetch("/api/taxonomy");
+      const taxData = await taxRes.json();
+      setTaxonomies(taxData);
+      fetchData();
+
+      setRenameTaxDialog({ open: false, item: null });
+      setRenameTaxName("");
+    } catch {
+      toast.error("重命名失败");
+    } finally {
+      setRenamingTax(false);
     }
   }
 
@@ -364,8 +399,8 @@ export default function PositionsPage() {
                 pos.longShort === "long"
                   ? "bg-emerald-50/50 dark:bg-emerald-950/10"
                   : pos.longShort === "short"
-                  ? "bg-rose-50/50 dark:bg-rose-950/10"
-                  : ""
+                    ? "bg-rose-50/50 dark:bg-rose-950/10"
+                    : ""
               }
             >
               {/* Priority - inline select */}
@@ -492,16 +527,16 @@ export default function PositionsPage() {
                     pos.longShort === "long"
                       ? "default"
                       : pos.longShort === "short"
-                      ? "destructive"
-                      : "secondary"
+                        ? "destructive"
+                        : "secondary"
                   }
                   className="text-xs"
                 >
                   {pos.longShort === "long"
                     ? "L"
                     : pos.longShort === "short"
-                    ? "S"
-                    : "/"}
+                      ? "S"
+                      : "/"}
                 </Badge>
               </TableCell>
 
@@ -649,6 +684,42 @@ export default function PositionsPage() {
             >
               {creatingTax && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               创建并分配
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Taxonomy Dialog */}
+      <Dialog
+        open={renameTaxDialog.open}
+        onOpenChange={(open) => {
+          setRenameTaxDialog((prev) => ({ ...prev, open }));
+          if (!open) setRenameTaxName("");
+        }}
+      >
+        <DialogContent className="sm:max-w-[360px]">
+          <DialogHeader>
+            <DialogTitle>
+              重命名「{renameTaxDialog.item?.name}」
+            </DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            placeholder="输入新名称"
+            value={renameTaxName}
+            onChange={(e) => setRenameTaxName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleRenameTaxonomy();
+            }}
+          />
+          <DialogFooter>
+            <Button
+              onClick={handleRenameTaxonomy}
+              disabled={renamingTax || !renameTaxName.trim()}
+              size="sm"
+            >
+              {renamingTax && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              确认修改
             </Button>
           </DialogFooter>
         </DialogContent>

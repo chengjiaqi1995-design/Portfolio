@@ -22,6 +22,10 @@ export async function POST(request: NextRequest) {
     const nameMappings = queryAll<NameMappingRow>("SELECT * FROM NameMapping");
     const nameMap = new Map(nameMappings.map((m) => [m.bbgName.toLowerCase(), m]));
 
+    // Reset all existing active positions to 0 (watchlist state) before import.
+    // This prevents ghost positions (sold stocks not in the new file) from accumulating and causing duplicate calculations.
+    run(`UPDATE Position SET longShort = '/', positionAmount = 0, positionWeight = 0 WHERE longShort IN ('long', 'short')`);
+
     let total = 0;
     let matched = 0;
     let created = 0;
@@ -32,6 +36,8 @@ export async function POST(request: NextRequest) {
       const bbgName = String(row["Underlying_Description"] ?? "").trim();
       const tickerBbg = String(row["BB Yellow Key"] ?? "").trim();
       const riskCountry = String(row["First Risk Country"] ?? "").trim();
+      const gicIndustry = String(row["First GIC industry"] ?? "").trim();
+      const exchangeCountry = String(row["First exchange country"] ?? "").trim();
 
       // Skip empty rows, "Total" summary rows, and the grand total row
       if (!tickerBbg || tickerBbg === "Total") continue;
@@ -39,9 +45,29 @@ export async function POST(request: NextRequest) {
 
       total++;
 
-      // Support both old format ("NMV excl Cash & FX") and new format ("Latest NMV" / "Avg NMV")
-      const nmvRaw = row["NMV excl Cash & FX"] ?? row["Latest NMV"] ?? row["Avg NMV"] ?? "0";
-      const nmvExclCash = parseFloat(String(nmvRaw));
+      // STRICTLY use Latest NMV. 
+      // Many times Excel column headers have hidden spaces like "Latest NMV " or " Latest NMV".
+      // We explicitly search the object keys to find the one that includes "latest nmv", case insensitive.
+      let nmvRaw: unknown = "0";
+      for (const key of Object.keys(row)) {
+        if (key.toLowerCase().includes("latest nmv")) {
+          nmvRaw = row[key];
+          break;
+        }
+      }
+
+      // If absolutely no 'Latest NMV' variation is found, we fall back ONLY to the oldest format "NMV excl Cash & FX"
+      // We NEVER fall back to "Avg NMV" as that causes mathematical errors.
+      if (nmvRaw === "0") {
+        for (const key of Object.keys(row)) {
+          if (key.toLowerCase().includes("nmv excl cash")) {
+            nmvRaw = row[key];
+            break;
+          }
+        }
+      }
+
+      const nmvExclCash = parseFloat(String(nmvRaw).replace(/,/g, ''));
 
       const mapping = nameMap.get(bbgName.toLowerCase());
       const chineseName = mapping ? mapping.chineseName : "";
@@ -60,36 +86,28 @@ export async function POST(request: NextRequest) {
       const positionWeight = positionAmount / AUM;
       const market = riskCountry;
 
-      // Try to find existing position by tickerBbg
-      const existing = queryOne<PositionRow>(
-        "SELECT * FROM Position WHERE tickerBbg = ?",
-        [tickerBbg]
+      run(
+        `INSERT INTO Position (
+           tickerBbg, nameEn, nameCn, market, longShort, positionAmount, positionWeight, 
+           gicIndustry, exchangeCountry, createdAt, updatedAt
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+         ON CONFLICT(tickerBbg) DO UPDATE SET
+           nameEn = excluded.nameEn,
+           nameCn = excluded.nameCn,
+           market = excluded.market,
+           longShort = excluded.longShort,
+           positionAmount = excluded.positionAmount,
+           positionWeight = excluded.positionWeight,
+           gicIndustry = excluded.gicIndustry,
+           exchangeCountry = excluded.exchangeCountry,
+           updatedAt = datetime('now')`,
+        [
+          tickerBbg, bbgName, chineseName, market, longShort, positionAmount, positionWeight,
+          gicIndustry, exchangeCountry
+        ]
       );
-
-      if (existing) {
-        run(
-          `UPDATE Position SET nameEn = ?, nameCn = ?, market = ?, longShort = ?,
-           positionAmount = ?, positionWeight = ?, updatedAt = datetime('now')
-           WHERE id = ?`,
-          [
-            bbgName || existing.nameEn,
-            chineseName || existing.nameCn,
-            market || existing.market,
-            longShort,
-            positionAmount,
-            positionWeight,
-            existing.id,
-          ]
-        );
-        updated++;
-      } else {
-        run(
-          `INSERT INTO Position (tickerBbg, nameEn, nameCn, market, longShort, positionAmount, positionWeight, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-          [tickerBbg, bbgName, chineseName, market, longShort, positionAmount, positionWeight]
-        );
-        created++;
-      }
+      // We assume it's an update for logic simplicity, though it could be new
+      updated++;
     }
 
     // Create import history record

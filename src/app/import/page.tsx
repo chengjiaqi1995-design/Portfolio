@@ -26,6 +26,7 @@ import {
   FileSpreadsheet,
   Check,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -88,13 +89,12 @@ function DropZone({
 
   return (
     <div
-      className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors cursor-pointer ${
-        dragOver
+      className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors cursor-pointer ${dragOver
           ? "border-primary bg-primary/5"
           : accepted
-          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/10"
-          : "border-muted-foreground/25 hover:border-muted-foreground/50"
-      }`}
+            ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/10"
+            : "border-muted-foreground/25 hover:border-muted-foreground/50"
+        }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -137,6 +137,7 @@ export default function ImportPage() {
   // Name mapping edits for unmatched
   const [nameMappings, setNameMappings] = useState<NameMappingEntry[]>([]);
   const [importConfirming, setImportConfirming] = useState(false);
+  const [aiTranslating, setAiTranslating] = useState(false);
 
   // Import history
   const [history, setHistory] = useState<ImportHistoryItem[]>([]);
@@ -226,6 +227,65 @@ export default function ImportPage() {
       next[index] = { ...next[index], chineseName };
       return next;
     });
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>, startIndex: number) {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text");
+    if (!pasteData) return;
+
+    // Split by newlines (handle both \r\n and \n)
+    const lines = pasteData.split(/\r?\n/).filter((line) => line.trim() !== "");
+
+    setNameMappings((prev) => {
+      const next = [...prev];
+      for (let i = 0; i < lines.length && startIndex + i < next.length; i++) {
+        next[startIndex + i] = { ...next[startIndex + i], chineseName: lines[i].trim() };
+      }
+      return next;
+    });
+  }
+
+  async function handleAiTranslate() {
+    // Only translate the ones that don't have a chineseName yet
+    const toTranslate = nameMappings.filter((m) => !m.chineseName.trim());
+    if (toTranslate.length === 0) {
+      toast.info("所有名称都已填写，无需翻译");
+      return;
+    }
+
+    setAiTranslating(true);
+    const toastId = toast.loading("AI 正在翻译公司名称，请稍候...");
+    try {
+      const res = await fetch("/api/ai/translate-names", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bbgNames: toTranslate.map((m) => m.bbgName),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "翻译失败");
+
+      toast.success("AI 翻译完成", { id: toastId });
+
+      // Update the name mappings with translations
+      setNameMappings((prev) => {
+        return prev.map((mapping) => {
+          if (data.mappings && data.mappings[mapping.bbgName]) {
+            return {
+              ...mapping,
+              chineseName: data.mappings[mapping.bbgName],
+            };
+          }
+          return mapping;
+        });
+      });
+    } catch (err: any) {
+      toast.error(err.message, { id: toastId });
+    } finally {
+      setAiTranslating(false);
+    }
   }
 
   async function handleConfirmImport() {
@@ -377,12 +437,28 @@ export default function ImportPage() {
 
             {/* Unmatched Names */}
             {nameMappings.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-500" />
-                  <h4 className="text-sm font-medium">
-                    未匹配名称 - 请输入中文名称
-                  </h4>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <h4 className="text-sm font-medium">
+                      未匹配名称 - 请输入中文名称
+                    </h4>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleAiTranslate}
+                    disabled={aiTranslating}
+                    className="bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200"
+                  >
+                    {aiTranslating ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    AI 一键翻译
+                  </Button>
                 </div>
                 <Table>
                   <TableHeader>
@@ -403,7 +479,8 @@ export default function ImportPage() {
                             onChange={(e) =>
                               updateNameMapping(idx, e.target.value)
                             }
-                            placeholder="输入中文名称"
+                            onPaste={(e) => handlePaste(e, idx)}
+                            placeholder="输入中文名称 (支持多行 Excel 粘贴)"
                             className="text-sm h-8"
                           />
                         </TableCell>

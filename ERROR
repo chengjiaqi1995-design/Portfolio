@@ -1,0 +1,202 @@
+[
+  {
+    "insertId": "69a2bb38000ca4f757256902",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:54:00.955071009Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:54:00.825931\" severity=INFO message=\"Existing file dev.db-wal of size 4120032 bytes (non-zero) will use legacy staged writes. Streaming writes is supported for sequential writes to new/empty files. For more details, see: https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/semantics.md#writes\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:54:00.828663Z"
+  },
+  {
+    "insertId": "69a2bb3800096525a8b4521e",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:54:00.621483975Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:54:00.613023\" severity=INFO message=\"Existing file dev.db-shm of size 32768 bytes (non-zero) will use legacy staged writes. Streaming writes is supported for sequential writes to new/empty files. For more details, see: https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/semantics.md#writes\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:54:00.615717Z"
+  },
+  {
+    "insertId": "69a2ba3b000bc02930177d40",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:49:48.032526615Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:49:47.526961\" severity=INFO message=\"File system has been successfully mounted.\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:49:47.770089Z"
+  },
+  {
+    "insertId": "69a2ba3b000bc02496ae7537",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:49:48.032526615Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:49:47.526169\" severity=INFO message=\"Mounting file system \\\"portfolio-manager-db-storage\\\"...\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:49:47.770084Z"
+  },
+  {
+    "insertId": "69a2ba3b000bc0183b459566",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:49:48.032526615Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:49:47.514697\" severity=INFO message=\"GetStorageLayout -> (portfolio-manager-db-storage) 90 msec\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:49:47.770072Z"
+  },
+  {
+    "insertId": "69a2ba3b000bbec0c6a52d26",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:49:48.032526615Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:49:47.423857\" severity=INFO message=\"GetStorageLayout <- (portfolio-manager-db-storage)\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:49:47.769728Z"
+  },
+  {
+    "insertId": "69a2ba3b00067e88234150db",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:49:47.696402485Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:49:47.423833\" severity=INFO message=\"Set up root directory for bucket portfolio-manager-db-storage\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:49:47.425608Z"
+  },
+  {
+    "insertId": "69a2ba3b00067d33b730b4ba",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:49:47.696402485Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:49:47.423817\" severity=INFO message=\"MRD cache (LRU-based) enabled with maxSize=1000 (pools closed-file MRDs)\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:49:47.425267Z"
+  },
+  {
+    "insertId": "69a2ba3b00067a948d1e98d6",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:49:47.696402485Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:49:47.422981\" severity=INFO message=\"Creating a new server...\\n\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:49:47.424596Z"
+  },
+  {
+    "insertId": "69a2ba3b00065050343b8dc1",
+    "labels": {
+      "instanceId": "00da6cd2c4c9a4115397defc467a39dbc6ad4651ee0d57c61af6a653c1045ac3ee40d5e51e0fc3ae106767c7561fe77c3fbdf0fa8229ceac4aa016bc4970b6504eb279e1102a7193607cc9e78ef0a88277"
+    },
+    "logName": "projects/gen-lang-client-0634831802/logs/run.googleapis.com%2F%2Fvar%2Flog%2Fsystem",
+    "receiveTimestamp": "2026-02-28T09:49:47.696402485Z",
+    "resource": {
+      "labels": {
+        "configuration_name": "portfolio-manager",
+        "location": "asia-southeast1",
+        "project_id": "gen-lang-client-0634831802",
+        "revision_name": "portfolio-manager-00009-p75",
+        "service_name": "portfolio-manager"
+      },
+      "type": "cloud_run_revision"
+    },
+    "textPayload": "time=\"28/02/2026 09:49:47.411351\" severity=INFO message=\"UserAgent = gcsfuse/3.7.0 (Go version go1.24.11) (GPN:gcsfuse-serverless) (Cfg:0:0:0:1:0:0) (mount-id:portfolio-manager-db-storage-3fee9e7f)\\n\" mount-id=portfolio-manager-db-storage-3fee9e7f",
+    "timestamp": "2026-02-28T09:49:47.413776Z"
+  }
+]

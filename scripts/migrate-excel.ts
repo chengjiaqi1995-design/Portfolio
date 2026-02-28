@@ -197,7 +197,7 @@ async function main() {
         const allData = XLSX.utils.sheet_to_json<Record<string, unknown>>(mainSheet, {
           header: 1,
           defval: null
-        }) as unknown[][];
+        }) as unknown as unknown[][];
 
         // Find the stock list section (starts around row 40)
         let stockStartRow = -1;
@@ -213,8 +213,8 @@ async function main() {
           console.log(`  持仓数据从第 ${stockStartRow + 1} 行开始`);
 
           const taxonomies = await prisma.taxonomy.findMany();
-          const sectorMap = new Map(taxonomies.filter(t => t.type === "sector").map(t => [t.name, t.id]));
-          const topdownMap = new Map(taxonomies.filter(t => t.type === "topdown").map(t => [t.name, t.id]));
+          const sectorMap = new Map(taxonomies.filter((t: any) => t.type === "sector").map((t: any) => [t.name, t.id]));
+          const topdownMap = new Map(taxonomies.filter((t: any) => t.type === "topdown").map((t: any) => [t.name, t.id]));
 
           let importCount = 0;
 
