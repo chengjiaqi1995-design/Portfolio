@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   List,
   ArrowLeftRight,
-  FileText,
   Upload,
   Settings,
 } from "lucide-react";
@@ -16,7 +15,6 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/positions", label: "Positions", icon: List },
   { href: "/trade", label: "Trade", icon: ArrowLeftRight },
-  { href: "/research", label: "Research", icon: FileText },
   { href: "/import", label: "Import", icon: Upload },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
