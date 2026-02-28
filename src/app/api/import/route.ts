@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     let created = 0;
     let updated = 0;
     const unmatched: { bbgName: string }[] = [];
+    const zeroNmvTickers: { ticker: string; nmvRaw: string; nmvParsed: number }[] = [];
 
     for (const row of rows) {
       const bbgName = findColumn(row, "underlying") || String(row["Underlying_Description"] ?? "").trim();
@@ -108,6 +109,11 @@ export async function POST(request: NextRequest) {
       const positionWeight = positionAmount / AUM;
       const market = riskCountry;
 
+      // Track zero-NMV positions for debugging
+      if (isNaN(nmvExclCash) || nmvExclCash === 0) {
+        zeroNmvTickers.push({ ticker: tickerBbg, nmvRaw: String(nmvRaw), nmvParsed: nmvExclCash });
+      }
+
       run(
         `INSERT INTO Position (
            tickerBbg, nameEn, nameCn, market, longShort, positionAmount, positionWeight, 
@@ -139,7 +145,7 @@ export async function POST(request: NextRequest) {
       ["positions", file.name, total, created, updated]
     );
 
-    return NextResponse.json({ total, matched, unmatched, created, updated, excelColumns, debugSamples });
+    return NextResponse.json({ total, matched, unmatched, created, updated, excelColumns, debugSamples, zeroNmvTickers });
   } catch (error) {
     console.error("Failed to import positions:", error);
     return NextResponse.json(

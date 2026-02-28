@@ -514,11 +514,11 @@ export default function PositionsPage() {
 
               <TableCell className="px-1">
                 <span
-                  className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-semibold border ${pos.longShort === "long"
-                      ? "border-[#B8860B] text-[#B8860B]"
+                  className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-semibold ${pos.longShort === "long"
+                      ? "bg-[#B8860B] text-white"
                       : pos.longShort === "short"
-                        ? "border-[#6B6B6B] text-[#6B6B6B]"
-                        : "border-[#E8E4DF] text-[#E8E4DF]"
+                        ? "bg-[#1A1A1A] text-white"
+                        : "bg-[#E8E4DF] text-[#6B6B6B]"
                     }`}
                 >
                   {pos.longShort === "long" ? "L" : pos.longShort === "short" ? "S" : "/"}
