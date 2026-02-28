@@ -206,7 +206,7 @@ function EChartsScatter({ data, height = 220 }: {
     },
     series: [{
       type: "scatter",
-      symbolSize: (val: number[]) => Math.max(6, Math.min(Math.sqrt(val[0] / 5000) * 3, 18)),
+      symbolSize: 5,
       label: {
         show: true,
         formatter: (params: any) => params.value[2],
@@ -324,11 +324,18 @@ export default function DashboardPage() {
     })),
     [activePositions]);
 
-  // Scatter plot data: filtered by current dimension's categories
+  // Scatter plot data: dimension aggregates (each dot = one category)
   const scatterDimData = useMemo(() => {
-    if (!selectedCategory) return scatterAllData;
-    return scatterAllData.filter((_, i) => getDimValue(activePositions[i], dim) === selectedCategory);
-  }, [scatterAllData, activePositions, selectedCategory, dim]);
+    if (!summary) return [];
+    return dimData
+      .filter(d => d.gmv > 0.001)
+      .map(d => ({
+        name: d.name,
+        gmv: d.gmv * summary.aum,
+        pnl: d.pnl,
+        isLong: d.nmv >= 0,
+      }));
+  }, [dimData, summary]);
 
   const filteredPositions = useMemo(() => {
     if (!selectedCategory) return activePositions;
@@ -567,7 +574,7 @@ export default function DashboardPage() {
             <Card className="py-1.5">
               <CardHeader className="px-3 py-1">
                 <CardTitle className="font-serif text-sm font-semibold">
-                  GMV vs PNL{selectedCategory ? ` — ${selectedCategory}` : ` — by ${DIM_TABS.find(d => d.key === dim)?.label}`}
+                  GMV vs PNL — by {DIM_TABS.find(d => d.key === dim)?.label}
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-1 py-0">

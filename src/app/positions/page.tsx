@@ -394,13 +394,6 @@ export default function PositionsPage() {
           {data.map((pos) => (
             <TableRow
               key={pos.id}
-              className={
-                pos.longShort === "long"
-                  ? "bg-emerald-50/50 dark:bg-emerald-950/10"
-                  : pos.longShort === "short"
-                    ? "bg-rose-50/50 dark:bg-rose-950/10"
-                    : ""
-              }
             >
               {/* Priority - inline select */}
               <TableCell className="px-1 py-0.5">
@@ -519,24 +512,17 @@ export default function PositionsPage() {
                 </div>
               </TableCell>
 
-              {/* L/S */}
               <TableCell className="px-1">
-                <Badge
-                  variant={
-                    pos.longShort === "long"
-                      ? "default"
+                <span
+                  className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-semibold border ${pos.longShort === "long"
+                      ? "border-[#B8860B] text-[#B8860B]"
                       : pos.longShort === "short"
-                        ? "destructive"
-                        : "secondary"
-                  }
-                  className="text-xs"
+                        ? "border-[#6B6B6B] text-[#6B6B6B]"
+                        : "border-[#E8E4DF] text-[#E8E4DF]"
+                    }`}
                 >
-                  {pos.longShort === "long"
-                    ? "L"
-                    : pos.longShort === "short"
-                      ? "S"
-                      : "/"}
-                </Badge>
+                  {pos.longShort === "long" ? "L" : pos.longShort === "short" ? "S" : "/"}
+                </span>
               </TableCell>
 
               {/* Position% */}
