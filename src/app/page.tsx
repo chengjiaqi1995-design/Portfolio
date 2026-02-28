@@ -120,11 +120,12 @@ function EChartsPie({ data, formatter, height = 220, selected, onSelect }: {
       formatter: (name: string) => name.length > 8 ? name.slice(0, 8) + "\u2026" : name,
       itemWidth: 8,
       itemHeight: 8,
+      itemGap: 6,
     },
     series: [{
       type: "pie",
       radius: ["18%", "55%"],
-      center: ["30%", "50%"],
+      center: ["35%", "50%"],
       avoidLabelOverlap: true,
       itemStyle: { borderRadius: 3, borderColor: "#FAFAF8", borderWidth: 2 },
       label: {
@@ -142,23 +143,21 @@ function EChartsPie({ data, formatter, height = 220, selected, onSelect }: {
         label: { show: true, fontSize: 11, fontWeight: "bold" },
         itemStyle: { shadowBlur: 8, shadowColor: "rgba(184,134,11,0.2)" },
       },
-      selectedMode: "single",
       data: data.map((d, i) => ({
         ...d,
         itemStyle: {
           color: PIE_COLORS[i % PIE_COLORS.length],
           opacity: selected && selected !== d.name ? 0.3 : 1,
         },
-        selected: selected === d.name,
       })),
     }],
   };
 
-  const onEvents = onSelect ? {
+  const onEvents: Record<string, Function> | undefined = onSelect ? {
     click: (params: any) => {
       onSelect(params.name === selected ? null : params.name);
     },
-  } : {};
+  } : undefined;
 
   return (
     <ReactEChartsCore echarts={echarts} option={option} onEvents={onEvents}
@@ -296,7 +295,7 @@ export default function DashboardPage() {
         <TableCell className="px-1.5 py-0.5 text-[11px] font-medium truncate max-w-[100px]">{pos.nameCn || pos.nameEn}</TableCell>
         <TableCell className="px-1.5 py-0.5 text-[10px] font-mono text-[var(--muted-foreground)]">{pos.tickerBbg}</TableCell>
         <TableCell className={`px-1.5 py-0.5 text-[11px] font-mono text-right font-medium ${isLong ? "text-emerald-700" : "text-rose-700"}`}>
-          {formatPct(pos.positionAmount / summary.aum)}
+          {formatPct(pos.positionAmount / (summary?.aum || 1))}
         </TableCell>
         <TableCell className={`px-1.5 py-0.5 text-[11px] font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
           {formatUsdK(pos.pnl || 0)}
@@ -355,8 +354,8 @@ export default function DashboardPage() {
 
       {/* Main area: Charts (left) + Positions (right) */}
       <div className="flex gap-3" style={{ minHeight: "calc(100vh - 200px)" }}>
-        {/* LEFT: Charts */}
-        <div className="flex-1 min-w-0 space-y-3">
+        {/* LEFT: Charts (compact) */}
+        <div className="w-[55%] flex-shrink-0 min-w-0 space-y-3">
           {/* NET row */}
           <div className="grid grid-cols-2 gap-3">
             <Card className="py-1.5">
@@ -482,84 +481,80 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* RIGHT: Linked Positions Table */}
-        <div className="w-[340px] flex-shrink-0">
-          <Card className="sticky top-0 h-[calc(100vh-200px)] flex flex-col">
-            <CardHeader className="px-3 py-2 border-b border-[var(--border)] flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <CardTitle className="font-serif text-sm font-semibold">
+        {/* RIGHT: Linked Positions Table — Long & Short side by side */}
+        <div className="flex-1 min-w-0">
+          <div className="sticky top-0">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h2 className="font-serif text-sm font-semibold">
                   {selectedCategory ? selectedCategory : "All Positions"}
-                </CardTitle>
-                {selectedCategory && (
-                  <button
-                    onClick={() => setSelectedCategory(null)}
-                    className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 rounded hover:bg-[var(--muted)]"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
+                </h2>
+                <p className="small-caps text-[0.5625rem] mt-0.5 {selectedCategory ? 'text-[var(--accent)]' : ''}">
+                  {longPositions.length}L / {shortPositions.length}S{!selectedCategory && ' · Click chart to filter'}
+                </p>
               </div>
               {selectedCategory && (
-                <p className="small-caps text-[0.5625rem] text-[var(--accent)] mt-0.5">
-                  {longPositions.length}L / {shortPositions.length}S
-                </p>
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 rounded hover:bg-[var(--muted)]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               )}
-              {!selectedCategory && (
-                <p className="small-caps text-[0.5625rem] mt-0.5">
-                  {longPositions.length}L / {shortPositions.length}S · Click chart to filter
-                </p>
-              )}
-            </CardHeader>
-            <CardContent className="px-0 py-0 flex-1 overflow-y-auto">
+            </div>
+            {/* Side-by-side Long / Short */}
+            <div className="grid grid-cols-2 gap-3" style={{ maxHeight: "calc(100vh - 240px)" }}>
               {/* Long */}
-              {longPositions.length > 0 && (
-                <div>
-                  <div className="px-3 py-1.5 bg-emerald-50/50 border-b border-[var(--border)] sticky top-0">
-                    <span className="small-caps text-[0.5625rem] text-emerald-700">Long · {longPositions.length}</span>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
+              <Card className="py-1.5 overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 240px)" }}>
+                <CardHeader className="px-3 py-1 border-b border-[var(--border)] flex-shrink-0">
+                  <CardTitle className="font-serif text-sm font-semibold text-emerald-700">Long · {longPositions.length}</CardTitle>
+                </CardHeader>
+                <CardContent className="px-0 py-0 flex-1 overflow-y-auto">
+                  {longPositions.length === 0 ? (
+                    <p className="text-xs text-[var(--muted-foreground)] py-6 text-center">No longs</p>
+                  ) : (
+                    <Table>
+                      <TableHeader><TableRow>
                         <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
                         <TableHead className="px-1.5 text-[10px]">Company</TableHead>
                         <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
                         <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
                         <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {longPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                      </TableRow></TableHeader>
+                      <TableBody>
+                        {longPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
               {/* Short */}
-              {shortPositions.length > 0 && (
-                <div>
-                  <div className="px-3 py-1.5 bg-rose-50/50 border-b border-t border-[var(--border)] sticky top-0">
-                    <span className="small-caps text-[0.5625rem] text-rose-700">Short · {shortPositions.length}</span>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
+              <Card className="py-1.5 overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 240px)" }}>
+                <CardHeader className="px-3 py-1 border-b border-[var(--border)] flex-shrink-0">
+                  <CardTitle className="font-serif text-sm font-semibold text-rose-700">Short · {shortPositions.length}</CardTitle>
+                </CardHeader>
+                <CardContent className="px-0 py-0 flex-1 overflow-y-auto">
+                  {shortPositions.length === 0 ? (
+                    <p className="text-xs text-[var(--muted-foreground)] py-6 text-center">No shorts</p>
+                  ) : (
+                    <Table>
+                      <TableHeader><TableRow>
                         <TableHead className="w-5 px-1.5 text-[10px]">#</TableHead>
                         <TableHead className="px-1.5 text-[10px]">Company</TableHead>
                         <TableHead className="px-1.5 text-[10px]">Ticker</TableHead>
                         <TableHead className="px-1.5 text-[10px] text-right">Wgt</TableHead>
                         <TableHead className="px-1.5 text-[10px] text-right">PNL</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {shortPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-              {longPositions.length === 0 && shortPositions.length === 0 && (
-                <p className="text-xs text-[var(--muted-foreground)] py-8 text-center">No positions</p>
-              )}
-            </CardContent>
-          </Card>
+                      </TableRow></TableHeader>
+                      <TableBody>
+                        {shortPositions.map((pos, idx) => <PositionRow key={pos.id} pos={pos} idx={idx} />)}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
     </div>
