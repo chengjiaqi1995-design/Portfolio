@@ -65,11 +65,12 @@ const DIM_TABS: { key: Dimension; label: string }[] = [
   { key: "exchangeCountry", label: "Exchange Country" },
 ];
 
+// Warm editorial pie colors
 const PIE_COLORS = [
-  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#ec4899", "#14b8a6", "#f97316", "#6366f1",
-  "#84cc16", "#e11d48", "#0ea5e9", "#d946ef", "#22d3ee",
-  "#a3e635", "#fb923c", "#a78bfa", "#2dd4bf", "#fbbf24",
+  "#B8860B", "#2D6A4F", "#4A6FA5", "#C77D4F", "#7B6D8D",
+  "#D4A84B", "#3D8B6E", "#6B8FC2", "#D9976A", "#9B8DAA",
+  "#8B7355", "#1A6B5A", "#5B7E9E", "#A86B3D", "#6A5B7B",
+  "#C4A55C", "#4E9E7F", "#7DA0C4", "#B58458", "#887B9B",
 ];
 
 function getDimData(summary: PortfolioSummary, dim: Dimension): SummaryByDimension[] {
@@ -82,19 +83,23 @@ function getDimData(summary: PortfolioSummary, dim: Dimension): SummaryByDimensi
 }
 
 function getDimValue(p: PositionWithRelations, dim: Dimension): string {
-  if (dim === "sector") return p.market || "其他";
-  if (dim === "industry") return p.sector?.name || "其他";
+  if (dim === "sector") return p.market || "Other";
+  if (dim === "industry") return p.sector?.name || "Other";
   if (dim === "theme") return p.topdown?.name || "Others";
-  if (dim === "riskCountry") return p.market || "其他";
-  if (dim === "gicIndustry") return p.gicIndustry || "其他";
-  return p.exchangeCountry || "其他";
+  if (dim === "riskCountry") return p.market || "Other";
+  if (dim === "gicIndustry") return p.gicIndustry || "Other";
+  return p.exchangeCountry || "Other";
 }
 
-// ===== ECharts Pie Component =====
+// ===== ECharts Pie — Serif-themed =====
 function EChartsPie({ data, formatter, height = 280 }: { data: { name: string; value: number }[]; formatter?: (value: number) => string; height?: number }) {
   const option = {
     tooltip: {
       trigger: "item",
+      backgroundColor: "#FFFFFF",
+      borderColor: "#E8E4DF",
+      borderWidth: 1,
+      textStyle: { color: "#1A1A1A", fontSize: 12 },
       formatter: (params: any) => {
         const pct = params.percent.toFixed(1);
         const val = formatter ? formatter(params.value) : `${params.value}%`;
@@ -106,7 +111,7 @@ function EChartsPie({ data, formatter, height = 280 }: { data: { name: string; v
       orient: "vertical",
       right: 0,
       top: "middle",
-      textStyle: { fontSize: 10 },
+      textStyle: { fontSize: 10, color: "#6B6B6B" },
       formatter: (name: string) => name.length > 10 ? name.slice(0, 10) + "\u2026" : name,
       itemWidth: 10,
       itemHeight: 10,
@@ -116,7 +121,7 @@ function EChartsPie({ data, formatter, height = 280 }: { data: { name: string; v
       radius: ["20%", "58%"],
       center: ["32%", "50%"],
       avoidLabelOverlap: true,
-      itemStyle: { borderRadius: 3, borderColor: "#fff", borderWidth: 1 },
+      itemStyle: { borderRadius: 3, borderColor: "#FAFAF8", borderWidth: 2 },
       label: {
         show: true,
         formatter: (params: any) => {
@@ -125,11 +130,12 @@ function EChartsPie({ data, formatter, height = 280 }: { data: { name: string; v
         },
         fontSize: 10,
         lineHeight: 13,
+        color: "#1A1A1A",
       },
-      labelLine: { show: true, length: 6, length2: 10 },
+      labelLine: { show: true, length: 6, length2: 10, lineStyle: { color: "#E8E4DF" } },
       emphasis: {
         label: { show: true, fontSize: 12, fontWeight: "bold" },
-        itemStyle: { shadowBlur: 8, shadowColor: "rgba(0,0,0,0.15)" },
+        itemStyle: { shadowBlur: 8, shadowColor: "rgba(184,134,11,0.2)" },
       },
       data: data.map((d, i) => ({ ...d, itemStyle: { color: PIE_COLORS[i % PIE_COLORS.length] } })),
     }],
@@ -140,7 +146,6 @@ function EChartsPie({ data, formatter, height = 280 }: { data: { name: string; v
   );
 }
 
-// ===== Y-axis width calculator =====
 function calcYAxisWidth(data: { name: string }[]) {
   if (data.length === 0) return 60;
   const maxLen = Math.max(...data.map(d => d.name.length));
@@ -151,14 +156,9 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [positions, setPositions] = useState<PositionWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Single global dimension
   const [dim, setDim] = useState<Dimension>("riskCountry");
-
-  // Drill-down
   const [selectedNetBar, setSelectedNetBar] = useState<string | null>(null);
   const [selectedGmvBar, setSelectedGmvBar] = useState<string | null>(null);
-
   const [editingAum, setEditingAum] = useState(false);
   const [aumInput, setAumInput] = useState("");
 
@@ -172,10 +172,7 @@ export default function DashboardPage() {
     });
   }
 
-  useEffect(() => {
-    refreshData();
-    setLoading(false);
-  }, []);
+  useEffect(() => { refreshData(); setLoading(false); }, []);
 
   async function saveAum() {
     const val = parseFloat(aumInput);
@@ -189,33 +186,25 @@ export default function DashboardPage() {
     refreshData();
   }
 
-  // Reset drill-down when dimension changes
   useEffect(() => { setSelectedNetBar(null); setSelectedGmvBar(null); }, [dim]);
 
-  // ===== Computed data =====
   const dimData = useMemo(() => {
     if (!summary) return [];
     return getDimData(summary, dim);
   }, [summary, dim]);
 
   const netData = useMemo(() =>
-    dimData
-      .filter(d => Math.abs(d.nmv) > 0.001)
-      .sort((a, b) => b.nmv - a.nmv)
+    dimData.filter(d => Math.abs(d.nmv) > 0.001).sort((a, b) => b.nmv - a.nmv)
       .map(d => ({ name: d.name, nmv: +(d.nmv * 100).toFixed(1), long: +(d.long * 100).toFixed(1), short: +(d.short * 100).toFixed(1) })),
     [dimData]);
 
   const gmvData = useMemo(() =>
-    dimData
-      .filter(d => d.gmv > 0.001)
-      .sort((a, b) => b.gmv - a.gmv)
+    dimData.filter(d => d.gmv > 0.001).sort((a, b) => b.gmv - a.gmv)
       .map(d => ({ name: d.name, gmv: +(d.gmv * 100).toFixed(1), long: +(d.long * 100).toFixed(1), short: +(d.short * 100).toFixed(1) })),
     [dimData]);
 
   const pnlData = useMemo(() =>
-    dimData
-      .filter(d => Math.abs(d.pnl) > 0.01)
-      .sort((a, b) => b.pnl - a.pnl)
+    dimData.filter(d => Math.abs(d.pnl) > 0.01).sort((a, b) => b.pnl - a.pnl)
       .map(d => ({ name: d.name, pnl: Math.round(d.pnl) })),
     [dimData]);
 
@@ -234,7 +223,6 @@ export default function DashboardPage() {
       .map(d => ({ name: d.name, value: Math.round(Math.abs(d.pnl)) })),
     [dimData]);
 
-  // Drill-down positions
   const drillNetPositions = useMemo(() => {
     if (!selectedNetBar) return [];
     return positions
@@ -250,19 +238,19 @@ export default function DashboardPage() {
   }, [selectedGmvBar, positions, dim]);
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+    return <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" /></div>;
   }
   if (!summary) {
-    return <div className="flex h-full items-center justify-center text-muted-foreground">Failed to load portfolio summary.</div>;
+    return <div className="flex h-full items-center justify-center text-[var(--muted-foreground)]">Failed to load portfolio summary.</div>;
   }
 
   const statCards = [
     { label: "AUM", value: formatAum(summary.aum), sub: `${summary.longCount}L / ${summary.shortCount}S / ${summary.watchlistCount}W` },
-    { label: "NMV%", value: formatPct(summary.nmv), color: summary.nmv >= 0 ? "text-emerald-600" : "text-rose-600" },
-    { label: "GMV%", value: formatPct(summary.gmv), color: "text-blue-600" },
-    { label: "Long%", value: formatPct(summary.totalLong), color: "text-emerald-600" },
-    { label: "Short%", value: formatPct(summary.totalShort), color: "text-rose-600" },
-    { label: "PNL", value: formatUsdK(summary.totalPnl || 0), color: (summary.totalPnl || 0) >= 0 ? "text-emerald-600" : "text-rose-600" },
+    { label: "NMV%", value: formatPct(summary.nmv), color: summary.nmv >= 0 ? "text-emerald-700" : "text-rose-700" },
+    { label: "GMV%", value: formatPct(summary.gmv), color: "text-[var(--accent)]" },
+    { label: "Long%", value: formatPct(summary.totalLong), color: "text-emerald-700" },
+    { label: "Short%", value: formatPct(summary.totalShort), color: "text-rose-700" },
+    { label: "PNL", value: formatUsdK(summary.totalPnl || 0), color: (summary.totalPnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700" },
   ];
 
   const longPositions = positions.filter(p => p.longShort === "long").sort((a, b) => b.positionAmount - a.positionAmount).slice(0, 10);
@@ -270,13 +258,13 @@ export default function DashboardPage() {
 
   function DrillTable({ selected, data, onClose }: { selected: string; data: PositionWithRelations[]; onClose: () => void }) {
     return (
-      <div className="mt-2 mb-2 mx-1 border rounded-md">
-        <div className="flex items-center justify-between px-3 py-1 bg-muted/50 border-b">
-          <span className="text-xs font-medium">{selected} — {data.length} 个持仓</span>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+      <div className="mt-2 mb-2 mx-1 border border-[var(--border)] rounded-md">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--muted)]/50 border-b border-[var(--border)]">
+          <span className="small-caps text-[0.625rem] text-[var(--accent)]">{selected} — {data.length} positions</span>
+          <button onClick={onClose} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"><X className="h-3.5 w-3.5" /></button>
         </div>
         {data.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-3 text-center">无持仓</p>
+          <p className="text-xs text-[var(--muted-foreground)] py-3 text-center">No positions</p>
         ) : (
           <Table>
             <TableHeader><TableRow>
@@ -290,16 +278,16 @@ export default function DashboardPage() {
               {data.map(pos => (
                 <TableRow key={pos.id} className="h-7">
                   <TableCell className="px-2 py-1 text-xs font-medium truncate max-w-[120px]">{pos.nameCn || pos.nameEn}</TableCell>
-                  <TableCell className="px-2 py-1 text-[11px] font-mono text-muted-foreground">{pos.tickerBbg}</TableCell>
+                  <TableCell className="px-2 py-1 text-[11px] font-mono text-[var(--muted-foreground)]">{pos.tickerBbg}</TableCell>
                   <TableCell className="px-2 py-1">
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${pos.longShort === "long" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${pos.longShort === "long" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
                       {pos.longShort === "long" ? "L" : "S"}
                     </span>
                   </TableCell>
-                  <TableCell className={`px-2 py-1 text-xs font-mono text-right font-medium ${pos.longShort === "long" ? "text-emerald-600" : "text-rose-600"}`}>
+                  <TableCell className={`px-2 py-1 text-xs font-mono text-right font-medium ${pos.longShort === "long" ? "text-emerald-700" : "text-rose-700"}`}>
                     {formatPct(pos.positionAmount / (summary?.aum || 1))}
                   </TableCell>
-                  <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                  <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
                     {formatUsdK(pos.pnl || 0)}
                   </TableCell>
                 </TableRow>
@@ -313,20 +301,27 @@ export default function DashboardPage() {
 
   const barHeight = (data: any[]) => Math.max(100, data.length * 26);
 
+  // Recharts tooltip style
+  const tooltipBox = "rounded-md border border-[#E8E4DF] bg-white p-2 text-xs shadow-md";
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header + Global Dimension Selector */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Dashboard</h1>
-        <div className="flex items-center gap-1 bg-muted/50 rounded-lg px-1 py-0.5">
+        <div>
+          <h1 className="font-serif text-2xl font-normal tracking-tight">Dashboard</h1>
+          <div className="h-0.5 w-12 bg-[var(--accent)] mt-1 rounded-full" />
+        </div>
+        <div className="flex items-center gap-0.5 border border-[var(--border)] rounded-lg px-1 py-0.5">
           {DIM_TABS.map(tab => (
             <button
               key={tab.key}
               onClick={() => setDim(tab.key)}
-              className={`px-3 py-1 text-xs rounded-md transition-all ${dim === tab.key
-                ? "bg-background shadow-sm text-primary font-semibold"
-                : "text-muted-foreground hover:text-foreground"
+              className={`px-3 py-1.5 text-xs rounded-md transition-all duration-200 ${dim === tab.key
+                ? "bg-[var(--accent)] text-white font-medium shadow-sm"
+                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]"
                 }`}
+              style={{ letterSpacing: "0.03em" }}
             >
               {tab.label}
             </button>
@@ -337,21 +332,21 @@ export default function DashboardPage() {
       {/* Stat Cards */}
       <div className="grid grid-cols-6 gap-3">
         {statCards.map(card => (
-          <Card key={card.label} className="py-2">
+          <Card key={card.label} className="py-3 card-accent-top">
             <CardContent className="px-4 py-0">
-              <p className="text-xs text-muted-foreground">{card.label}</p>
+              <p className="small-caps text-[0.5625rem] mb-1">{card.label}</p>
               {card.label === "AUM" && editingAum ? (
                 <Input autoFocus type="number" className="h-7 text-sm font-bold px-1 w-full"
                   value={aumInput} onChange={e => setAumInput(e.target.value)}
                   onBlur={saveAum} onKeyDown={e => { if (e.key === "Enter") saveAum(); if (e.key === "Escape") setEditingAum(false); }} />
               ) : (
-                <p className={`text-lg font-bold ${card.color ?? ""} ${card.label === "AUM" ? "cursor-pointer hover:text-primary group inline-flex items-center gap-1" : ""}`}
+                <p className={`font-serif text-xl font-semibold ${card.color ?? ""} ${card.label === "AUM" ? "cursor-pointer hover:text-[var(--accent)] group inline-flex items-center gap-1 transition-colors" : ""}`}
                   onClick={card.label === "AUM" ? () => { setAumInput(String(summary.aum)); setEditingAum(true); } : undefined}>
                   {card.value}
-                  {card.label === "AUM" && <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-50" />}
+                  {card.label === "AUM" && <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-40" />}
                 </p>
               )}
-              {card.sub && <p className="text-[10px] text-muted-foreground">{card.sub}</p>}
+              {card.sub && <p className="text-[10px] text-[var(--muted-foreground)] mt-0.5">{card.sub}</p>}
             </CardContent>
           </Card>
         ))}
@@ -360,30 +355,32 @@ export default function DashboardPage() {
       {/* Row 1: NET — Bar + Pie */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">Net Exposure</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1.5">
+            <CardTitle className="font-serif text-base font-semibold">Net Exposure</CardTitle>
+          </CardHeader>
           <CardContent className="px-1 py-0">
-            {netData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No data</p> : (
+            {netData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : (
               <ResponsiveContainer width="100%" height={barHeight(netData)}>
                 <BarChart data={netData} layout="vertical" margin={{ top: 2, right: 35, left: 2, bottom: 2 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tickFormatter={v => `${v}%`} tick={{ fontSize: 9 }} />
-                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(netData)} tick={{ fontSize: 9 }} />
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DF" />
+                  <XAxis type="number" tickFormatter={v => `${v}%`} tick={{ fontSize: 9, fill: "#6B6B6B" }} />
+                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(netData)} tick={{ fontSize: 9, fill: "#1A1A1A" }} />
                   <Tooltip content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
                     const d = payload[0].payload;
-                    return (<div className="rounded-md border bg-background p-2 text-xs shadow-md">
+                    return (<div className={tooltipBox}>
                       <p className="font-medium mb-1">{label}</p>
-                      <p>Net: <span className={d.nmv >= 0 ? "text-emerald-600" : "text-rose-600"}>{d.nmv}%</span></p>
-                      <p className="text-emerald-600">Long: {d.long}%</p>
-                      <p className="text-rose-600">Short: {d.short}%</p>
+                      <p>Net: <span className={d.nmv >= 0 ? "text-emerald-700" : "text-rose-700"}>{d.nmv}%</span></p>
+                      <p className="text-emerald-700">Long: {d.long}%</p>
+                      <p className="text-rose-700">Short: {d.short}%</p>
                     </div>);
                   }} />
                   <Bar dataKey="nmv" barSize={12} radius={[0, 3, 3, 0]} cursor="pointer"
                     onClick={(data: any) => setSelectedNetBar(prev => prev === data.name ? null : data.name)} isAnimationActive={false}>
                     {netData.map((entry, i) => (
-                      <Cell key={i} fill={entry.nmv >= 0 ? "#10b981" : "#f43f5e"} opacity={selectedNetBar && selectedNetBar !== entry.name ? 0.3 : 1} />
+                      <Cell key={i} fill={entry.nmv >= 0 ? "#2D6A4F" : "#C0392B"} opacity={selectedNetBar && selectedNetBar !== entry.name ? 0.3 : 1} />
                     ))}
-                    <LabelList dataKey="nmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 9, fill: "#666" }} />
+                    <LabelList dataKey="nmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 9, fill: "#6B6B6B" }} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -392,9 +389,11 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">NET Distribution</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1.5">
+            <CardTitle className="font-serif text-base font-semibold">NET Distribution</CardTitle>
+          </CardHeader>
           <CardContent className="px-1 py-0">
-            {netPieData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No data</p> : <EChartsPie data={netPieData} />}
+            {netPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : <EChartsPie data={netPieData} />}
           </CardContent>
         </Card>
       </div>
@@ -402,30 +401,32 @@ export default function DashboardPage() {
       {/* Row 2: GMV — Bar + Pie */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">Gross Exposure</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1.5">
+            <CardTitle className="font-serif text-base font-semibold">Gross Exposure</CardTitle>
+          </CardHeader>
           <CardContent className="px-1 py-0">
-            {gmvData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No data</p> : (
+            {gmvData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : (
               <ResponsiveContainer width="100%" height={barHeight(gmvData)}>
                 <BarChart data={gmvData} layout="vertical" margin={{ top: 2, right: 35, left: 2, bottom: 2 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tickFormatter={v => `${v}%`} tick={{ fontSize: 9 }} />
-                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(gmvData)} tick={{ fontSize: 9 }} />
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DF" />
+                  <XAxis type="number" tickFormatter={v => `${v}%`} tick={{ fontSize: 9, fill: "#6B6B6B" }} />
+                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(gmvData)} tick={{ fontSize: 9, fill: "#1A1A1A" }} />
                   <Tooltip content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
                     const d = payload[0].payload;
-                    return (<div className="rounded-md border bg-background p-2 text-xs shadow-md">
+                    return (<div className={tooltipBox}>
                       <p className="font-medium mb-1">{label}</p>
-                      <p>Gross: <span className="text-blue-600">{d.gmv}%</span></p>
-                      <p className="text-emerald-600">Long: {d.long}%</p>
-                      <p className="text-rose-600">Short: {d.short}%</p>
+                      <p>Gross: <span className="text-[var(--accent)]">{d.gmv}%</span></p>
+                      <p className="text-emerald-700">Long: {d.long}%</p>
+                      <p className="text-rose-700">Short: {d.short}%</p>
                     </div>);
                   }} />
                   <Bar dataKey="gmv" barSize={12} radius={[0, 3, 3, 0]} cursor="pointer"
                     onClick={(data: any) => setSelectedGmvBar(prev => prev === data.name ? null : data.name)} isAnimationActive={false}>
                     {gmvData.map((entry, i) => (
-                      <Cell key={i} fill="#3b82f6" opacity={selectedGmvBar && selectedGmvBar !== entry.name ? 0.3 : 1} />
+                      <Cell key={i} fill="#B8860B" opacity={selectedGmvBar && selectedGmvBar !== entry.name ? 0.3 : 1} />
                     ))}
-                    <LabelList dataKey="gmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 9, fill: "#666" }} />
+                    <LabelList dataKey="gmv" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 9, fill: "#6B6B6B" }} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -434,9 +435,11 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">GMV Distribution</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1.5">
+            <CardTitle className="font-serif text-base font-semibold">GMV Distribution</CardTitle>
+          </CardHeader>
           <CardContent className="px-1 py-0">
-            {gmvPieData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No data</p> : <EChartsPie data={gmvPieData} />}
+            {gmvPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> : <EChartsPie data={gmvPieData} />}
           </CardContent>
         </Card>
       </div>
@@ -444,25 +447,27 @@ export default function DashboardPage() {
       {/* Row 3: PNL — Bar + Pie */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">PNL Breakdown</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1.5">
+            <CardTitle className="font-serif text-base font-semibold">PNL Breakdown</CardTitle>
+          </CardHeader>
           <CardContent className="px-1 py-0">
-            {pnlData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No PNL data</p> : (
+            {pnlData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No PNL data</p> : (
               <ResponsiveContainer width="100%" height={barHeight(pnlData)}>
                 <BarChart data={pnlData} layout="vertical" margin={{ top: 2, right: 45, left: 2, bottom: 2 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tickFormatter={v => formatUsdK(v)} tick={{ fontSize: 9 }} />
-                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(pnlData)} tick={{ fontSize: 9 }} />
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DF" />
+                  <XAxis type="number" tickFormatter={v => formatUsdK(v)} tick={{ fontSize: 9, fill: "#6B6B6B" }} />
+                  <YAxis type="category" dataKey="name" width={calcYAxisWidth(pnlData)} tick={{ fontSize: 9, fill: "#1A1A1A" }} />
                   <Tooltip content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
                     const d = payload[0].payload;
-                    return (<div className="rounded-md border bg-background p-2 text-xs shadow-md">
+                    return (<div className={tooltipBox}>
                       <p className="font-medium mb-1">{label}</p>
-                      <p>PNL: <span className={d.pnl >= 0 ? "text-emerald-600" : "text-rose-600"}>{formatUsdK(d.pnl)}</span></p>
+                      <p>PNL: <span className={d.pnl >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatUsdK(d.pnl)}</span></p>
                     </div>);
                   }} />
                   <Bar dataKey="pnl" barSize={12} radius={[0, 3, 3, 0]} isAnimationActive={false}>
-                    {pnlData.map((entry, i) => <Cell key={i} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />)}
-                    <LabelList dataKey="pnl" position="right" formatter={(v: any) => formatUsdK(v)} style={{ fontSize: 9, fill: "#666" }} />
+                    {pnlData.map((entry, i) => <Cell key={i} fill={entry.pnl >= 0 ? "#2D6A4F" : "#C0392B"} />)}
+                    <LabelList dataKey="pnl" position="right" formatter={(v: any) => formatUsdK(v)} style={{ fontSize: 9, fill: "#6B6B6B" }} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -470,17 +475,27 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">PNL Distribution</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1.5">
+            <CardTitle className="font-serif text-base font-semibold">PNL Distribution</CardTitle>
+          </CardHeader>
           <CardContent className="px-1 py-0">
-            {pnlPieData.length === 0 ? <p className="text-xs text-muted-foreground py-4 text-center">No PNL data</p> : <EChartsPie data={pnlPieData} formatter={formatUsdK} />}
+            {pnlPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No PNL data</p> : <EChartsPie data={pnlPieData} formatter={formatUsdK} />}
           </CardContent>
         </Card>
       </div>
 
       {/* Top Positions */}
+      <div className="flex items-center gap-4 mt-2">
+        <span className="h-px flex-1 bg-[var(--border)]" />
+        <span className="small-caps text-[var(--accent)]">Top Holdings</span>
+        <span className="h-px flex-1 bg-[var(--border)]" />
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">Top 10 Long</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1.5">
+            <CardTitle className="font-serif text-base font-semibold">Top 10 Long</CardTitle>
+          </CardHeader>
           <CardContent className="px-2 py-0">
             <Table>
               <TableHeader><TableRow>
@@ -493,11 +508,11 @@ export default function DashboardPage() {
               <TableBody>
                 {longPositions.map((pos, idx) => (
                   <TableRow key={pos.id} className="h-7">
-                    <TableCell className="px-2 py-1 text-xs text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="px-2 py-1 text-xs text-[var(--muted-foreground)]">{idx + 1}</TableCell>
                     <TableCell className="px-2 py-1 text-xs font-medium truncate max-w-[120px]">{pos.nameCn || pos.nameEn}</TableCell>
-                    <TableCell className="px-2 py-1 text-[11px] font-mono text-muted-foreground">{pos.tickerBbg}</TableCell>
-                    <TableCell className="px-2 py-1 text-xs font-mono text-right text-emerald-600 font-medium">{formatPct(pos.positionAmount / summary.aum)}</TableCell>
-                    <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatUsdK(pos.pnl || 0)}</TableCell>
+                    <TableCell className="px-2 py-1 text-[11px] font-mono text-[var(--muted-foreground)]">{pos.tickerBbg}</TableCell>
+                    <TableCell className="px-2 py-1 text-xs font-mono text-right text-emerald-700 font-medium">{formatPct(pos.positionAmount / summary.aum)}</TableCell>
+                    <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>{formatUsdK(pos.pnl || 0)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -505,7 +520,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         <Card className="py-2">
-          <CardHeader className="px-4 py-1"><CardTitle className="text-sm">Top 10 Short</CardTitle></CardHeader>
+          <CardHeader className="px-4 py-1.5">
+            <CardTitle className="font-serif text-base font-semibold">Top 10 Short</CardTitle>
+          </CardHeader>
           <CardContent className="px-2 py-0">
             <Table>
               <TableHeader><TableRow>
@@ -518,11 +535,11 @@ export default function DashboardPage() {
               <TableBody>
                 {shortPositions.map((pos, idx) => (
                   <TableRow key={pos.id} className="h-7">
-                    <TableCell className="px-2 py-1 text-xs text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="px-2 py-1 text-xs text-[var(--muted-foreground)]">{idx + 1}</TableCell>
                     <TableCell className="px-2 py-1 text-xs font-medium truncate max-w-[120px]">{pos.nameCn || pos.nameEn}</TableCell>
-                    <TableCell className="px-2 py-1 text-[11px] font-mono text-muted-foreground">{pos.tickerBbg}</TableCell>
-                    <TableCell className="px-2 py-1 text-xs font-mono text-right text-rose-600 font-medium">{formatPct(pos.positionAmount / summary.aum)}</TableCell>
-                    <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatUsdK(pos.pnl || 0)}</TableCell>
+                    <TableCell className="px-2 py-1 text-[11px] font-mono text-[var(--muted-foreground)]">{pos.tickerBbg}</TableCell>
+                    <TableCell className="px-2 py-1 text-xs font-mono text-right text-rose-700 font-medium">{formatPct(pos.positionAmount / summary.aum)}</TableCell>
+                    <TableCell className={`px-2 py-1 text-xs font-mono text-right ${(pos.pnl || 0) >= 0 ? "text-emerald-700" : "text-rose-700"}`}>{formatUsdK(pos.pnl || 0)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
