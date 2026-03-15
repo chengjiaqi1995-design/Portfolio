@@ -34,12 +34,13 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
     const taxonomyId = parseInt(id);
+    const force = request.nextUrl.searchParams.get("force") === "true";
 
     // Check if any positions reference this taxonomy
     const sectorCount = queryOne<{ c: number }>("SELECT COUNT(*) as c FROM Position WHERE sectorId = ?", [taxonomyId])?.c || 0;
@@ -47,14 +48,22 @@ export async function DELETE(
     const topdownCount = queryOne<{ c: number }>("SELECT COUNT(*) as c FROM Position WHERE topdownId = ?", [taxonomyId])?.c || 0;
     const totalReferences = sectorCount + themeCount + topdownCount;
 
-    if (totalReferences > 0) {
+    if (totalReferences > 0 && !force) {
       return NextResponse.json(
         {
-          error: `Cannot delete: ${totalReferences} position(s) still reference this taxonomy item`,
+          error: `${totalReferences} 个持仓引用了此分类`,
           references: { sector: sectorCount, theme: themeCount, topdown: topdownCount },
+          totalReferences,
         },
         { status: 409 }
       );
+    }
+
+    // If force, unbind all positions referencing this taxonomy first
+    if (totalReferences > 0 && force) {
+      if (sectorCount > 0) run("UPDATE Position SET sectorId = NULL WHERE sectorId = ?", [taxonomyId]);
+      if (themeCount > 0) run("UPDATE Position SET themeId = NULL WHERE themeId = ?", [taxonomyId]);
+      if (topdownCount > 0) run("UPDATE Position SET topdownId = NULL WHERE topdownId = ?", [taxonomyId]);
     }
 
     run("DELETE FROM Taxonomy WHERE id = ?", [taxonomyId]);

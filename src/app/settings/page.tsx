@@ -133,16 +133,27 @@ function TaxonomySection({
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: number, force = false) {
     try {
-      const res = await fetch(`/api/taxonomy/${id}`, {
-        method: "DELETE",
-      });
+      const url = force ? `/api/taxonomy/${id}?force=true` : `/api/taxonomy/${id}`;
+      const res = await fetch(url, { method: "DELETE" });
+
+      if (res.status === 409 && !force) {
+        const data = await res.json();
+        const confirmed = window.confirm(
+          `有 ${data.totalReferences} 个持仓引用了此分类，删除后这些持仓的对应字段将被清空。\n确认删除？`
+        );
+        if (confirmed) {
+          await handleDelete(id, true);
+        }
+        return;
+      }
+
       if (!res.ok) throw new Error("Failed");
       toast.success("删除成功");
       onRefresh();
     } catch {
-      toast.error("删除失败，可能存在关联数据");
+      toast.error("删除失败");
     }
   }
 

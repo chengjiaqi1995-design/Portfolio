@@ -339,6 +339,16 @@ export default function DashboardPage() {
       .map(d => ({ name: d.name, value: Math.round(Math.abs(d.pnl)) })),
     [dimData]);
 
+  const longGmvPieData = useMemo(() =>
+    dimData.filter(d => d.long > 0.001).sort((a, b) => b.long - a.long)
+      .map(d => ({ name: d.name, value: +(d.long * 100).toFixed(1) })),
+    [dimData]);
+
+  const shortGmvPieData = useMemo(() =>
+    dimData.filter(d => Math.abs(d.short) > 0.001).sort((a, b) => Math.abs(b.short) - Math.abs(a.short))
+      .map(d => ({ name: d.name, value: +(Math.abs(d.short) * 100).toFixed(1) })),
+    [dimData]);
+
   // Linked positions table — filtered by selected category
   const activePositions = useMemo(() => {
     return positions.filter(p =>
@@ -590,6 +600,24 @@ export default function DashboardPage() {
               <CardContent className="px-1 py-0">
                 {gmvPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> :
                   <EChartsPie data={gmvPieData} height={barHeight(gmvData)} selected={selectedCategory} onSelect={toggleCategory} />}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Long/Short GMV Distribution row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">Long GMV Distribution</CardTitle></CardHeader>
+              <CardContent className="px-1 py-0">
+                {longGmvPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> :
+                  <EChartsPie data={longGmvPieData} height={barHeight(gmvData)} selected={selectedCategory} onSelect={toggleCategory} />}
+              </CardContent>
+            </Card>
+            <Card className="py-1.5">
+              <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">Short GMV Distribution</CardTitle></CardHeader>
+              <CardContent className="px-1 py-0">
+                {shortGmvPieData.length === 0 ? <p className="text-xs text-[var(--muted-foreground)] py-4 text-center">No data</p> :
+                  <EChartsPie data={shortGmvPieData} height={barHeight(gmvData)} selected={selectedCategory} onSelect={toggleCategory} />}
               </CardContent>
             </Card>
           </div>

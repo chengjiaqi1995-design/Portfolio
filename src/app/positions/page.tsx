@@ -13,6 +13,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
+import {
   Table,
   TableBody,
   TableCell,
@@ -35,7 +48,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Search, Plus, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Loader2, Search, Plus, Check, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
 import type { PositionWithRelations, TaxonomyItem } from "@/lib/types";
 
@@ -45,6 +58,116 @@ function formatPct(value: number): string {
 
 function formatMarketCap(rmb: number): string {
   return rmb.toFixed(1);
+}
+
+function TaxonomyCombobox({
+  items,
+  value,
+  onSelect,
+  onCreate,
+  placeholder = "搜索...",
+}: {
+  items: TaxonomyItem[];
+  value: number | null;
+  onSelect: (id: number | null) => void;
+  onCreate: (name: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const current = items.find((i) => i.id === value);
+  const hasExactMatch = items.some(
+    (i) => i.name.toLowerCase() === search.trim().toLowerCase()
+  );
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSearch(""); }}>
+      <PopoverTrigger asChild>
+        <button
+          className="h-7 text-xs px-1 w-full min-w-[70px] text-left truncate rounded hover:bg-[var(--muted)] transition-colors"
+        >
+          {current?.name || "-"}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start" sideOffset={2}>
+        <Command>
+          <CommandInput
+            placeholder={placeholder}
+            value={search}
+            onValueChange={setSearch}
+            className="h-8 text-xs"
+          />
+          <CommandList className="max-h-none overflow-visible">
+            <CommandEmpty>
+              {search.trim() ? (
+                <button
+                  className="w-full px-2 py-1 text-xs text-left text-primary hover:bg-accent rounded flex items-center gap-1"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onCreate(search.trim());
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  <Plus className="h-3 w-3" />
+                  新建「{search.trim()}」
+                </button>
+              ) : (
+                <span className="text-xs text-muted-foreground">无匹配项</span>
+              )}
+            </CommandEmpty>
+            <CommandGroup className="p-1 [&>div]:grid [&>div]:grid-cols-2 [&>div]:gap-0.5">
+              <CommandItem
+                value="__clear__"
+                onSelect={() => {
+                  onSelect(null);
+                  setOpen(false);
+                  setSearch("");
+                }}
+                className="px-2 py-1 text-xs rounded"
+              >
+                <span className="text-muted-foreground">- 清除</span>
+              </CommandItem>
+              {items.map((item) => (
+                <CommandItem
+                  key={item.id}
+                  value={item.name}
+                  onSelect={() => {
+                    onSelect(item.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                  className="px-2 py-1 text-xs rounded"
+                >
+                  <span className="truncate">{item.name}</span>
+                  {item.id === value && (
+                    <Check className="ml-auto h-3 w-3 shrink-0 text-primary" />
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            {search.trim() && !hasExactMatch && items.length > 0 && (
+              <CommandGroup className="p-1 border-t">
+                <CommandItem
+                  value={`__create_${search.trim()}`}
+                  onSelect={() => {
+                    onCreate(search.trim());
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                  className="px-2 py-1 text-xs text-primary rounded"
+                >
+                  <Plus className="h-3 w-3" />
+                  新建「{search.trim()}」
+                </CommandItem>
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function PositionsPage() {
@@ -132,6 +255,30 @@ export default function PositionsPage() {
       toast.error("创建失败");
     } finally {
       setCreatingTax(false);
+    }
+  }
+
+  // Quick-create taxonomy from combobox and assign to position
+  async function comboboxCreate(
+    pos: PositionWithRelations,
+    type: "topdown" | "sector" | "theme",
+    field: "topdownId" | "sectorId" | "themeId",
+    name: string
+  ) {
+    try {
+      const res = await fetch("/api/taxonomy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, name }),
+      });
+      if (!res.ok) throw new Error("Create failed");
+      const created: TaxonomyItem = await res.json();
+      await inlineSave(pos, field, created.id);
+      const taxRes = await fetch("/api/taxonomy");
+      const taxData = await taxRes.json();
+      setTaxonomies(taxData);
+    } catch {
+      toast.error("创建失败");
     }
   }
 
@@ -411,91 +558,37 @@ export default function PositionsPage() {
                 </Select>
               </TableCell>
 
-              {/* Topdown - inline select */}
+              {/* Topdown - inline combobox */}
               <TableCell className="px-1 py-0.5">
-                <Select
-                  value={pos.topdownId ? String(pos.topdownId) : "_none"}
-                  onValueChange={(v) => {
-                    if (v === "_new") {
-                      setNewTaxDialog({ open: true, type: "topdown", field: "topdownId", pos });
-                      return;
-                    }
-                    inlineSave(pos, "topdownId", v === "_none" ? null : Number(v));
-                  }}
-                >
-                  <SelectTrigger className="h-7 text-xs border-0 shadow-none bg-transparent px-1 w-full min-w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">-</SelectItem>
-                    {topdowns.map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="_new" className="text-primary">
-                      <span className="flex items-center gap-1"><Plus className="h-3 w-3" />新增</span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <TaxonomyCombobox
+                  items={topdowns}
+                  value={pos.topdownId}
+                  placeholder="搜索 Topdown..."
+                  onSelect={(id) => inlineSave(pos, "topdownId", id)}
+                  onCreate={(name) => comboboxCreate(pos, "topdown", "topdownId", name)}
+                />
               </TableCell>
 
-              {/* Sector - inline select */}
+              {/* Sector - inline combobox */}
               <TableCell className="px-1 py-0.5">
-                <Select
-                  value={pos.sectorId ? String(pos.sectorId) : "_none"}
-                  onValueChange={(v) => {
-                    if (v === "_new") {
-                      setNewTaxDialog({ open: true, type: "sector", field: "sectorId", pos });
-                      return;
-                    }
-                    inlineSave(pos, "sectorId", v === "_none" ? null : Number(v));
-                  }}
-                >
-                  <SelectTrigger className="h-7 text-xs border-0 shadow-none bg-transparent px-1 w-full min-w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">-</SelectItem>
-                    {sectors.map((s) => (
-                      <SelectItem key={s.id} value={String(s.id)}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="_new" className="text-primary">
-                      <span className="flex items-center gap-1"><Plus className="h-3 w-3" />新增</span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <TaxonomyCombobox
+                  items={sectors}
+                  value={pos.sectorId}
+                  placeholder="搜索 Sector..."
+                  onSelect={(id) => inlineSave(pos, "sectorId", id)}
+                  onCreate={(name) => comboboxCreate(pos, "sector", "sectorId", name)}
+                />
               </TableCell>
 
-              {/* Theme - inline select */}
+              {/* Theme - inline combobox */}
               <TableCell className="px-1 py-0.5">
-                <Select
-                  value={pos.themeId ? String(pos.themeId) : "_none"}
-                  onValueChange={(v) => {
-                    if (v === "_new") {
-                      setNewTaxDialog({ open: true, type: "theme", field: "themeId", pos });
-                      return;
-                    }
-                    inlineSave(pos, "themeId", v === "_none" ? null : Number(v));
-                  }}
-                >
-                  <SelectTrigger className="h-7 text-xs border-0 shadow-none bg-transparent px-1 w-full min-w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">-</SelectItem>
-                    {themes.map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="_new" className="text-primary">
-                      <span className="flex items-center gap-1"><Plus className="h-3 w-3" />新增</span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <TaxonomyCombobox
+                  items={themes}
+                  value={pos.themeId}
+                  placeholder="搜索 Theme..."
+                  onSelect={(id) => inlineSave(pos, "themeId", id)}
+                  onCreate={(name) => comboboxCreate(pos, "theme", "themeId", name)}
+                />
               </TableCell>
 
               {/* Market - read-only */}
