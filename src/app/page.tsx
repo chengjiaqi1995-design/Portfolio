@@ -54,11 +54,11 @@ function formatUsdK(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-type Dimension = "sector" | "industry" | "theme" | "riskCountry" | "gicIndustry" | "exchangeCountry";
+type Dimension = "topdown" | "sector" | "theme" | "riskCountry" | "gicIndustry" | "exchangeCountry";
 
 const DIM_TABS: { key: Dimension; label: string }[] = [
+  { key: "topdown", label: "Topdown" },
   { key: "sector", label: "Sector" },
-  { key: "industry", label: "Industry" },
   { key: "theme", label: "Theme" },
   { key: "riskCountry", label: "Risk Country" },
   { key: "gicIndustry", label: "GIC Industry" },
@@ -73,8 +73,8 @@ const PIE_COLORS = [
 ];
 
 function getDimData(summary: PortfolioSummary, dim: Dimension): SummaryByDimension[] {
-  if (dim === "sector") return summary.bySector;
-  if (dim === "industry") return summary.byIndustry;
+  if (dim === "topdown") return summary.byTopdown;
+  if (dim === "sector") return summary.byIndustry;
   if (dim === "theme") return summary.byTheme;
   if (dim === "riskCountry") return summary.byRiskCountry;
   if (dim === "gicIndustry") return summary.byGicIndustry;
@@ -82,9 +82,9 @@ function getDimData(summary: PortfolioSummary, dim: Dimension): SummaryByDimensi
 }
 
 function getDimValue(p: PositionWithRelations, dim: Dimension): string {
-  if (dim === "sector") return p.market || "Other";
-  if (dim === "industry") return p.sector?.name || "Other";
-  if (dim === "theme") return p.topdown?.name || "Others";
+  if (dim === "topdown") return p.topdown?.name || "Other";
+  if (dim === "sector") return p.sector?.name || "Other";
+  if (dim === "theme") return p.theme?.name || "Other";
   if (dim === "riskCountry") return p.market || "Other";
   if (dim === "gicIndustry") return p.gicIndustry || "Other";
   return p.exchangeCountry || "Other";

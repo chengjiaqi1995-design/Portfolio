@@ -67,6 +67,7 @@ export interface PortfolioSummary {
   bySector: SummaryByDimension[];
   byIndustry: SummaryByDimension[];
   byTheme: SummaryByDimension[];
+  byTopdown: SummaryByDimension[];
   byRiskCountry: SummaryByDimension[];
   byGicIndustry: SummaryByDimension[];
   byExchangeCountry: SummaryByDimension[];

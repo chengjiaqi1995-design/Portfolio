@@ -304,6 +304,7 @@ export function getPortfolioSummary() {
     pnl: number;
     market: string;
     sectorName: string;
+    themeName: string;
     topdownName: string;
     gicIndustry: string;
     exchangeCountry: string;
@@ -320,6 +321,7 @@ export function getPortfolioSummary() {
       // Keep first non-empty values for dimensions
       if (!existing.market && p.market) existing.market = p.market;
       if (!existing.sectorName && p.sectorName) existing.sectorName = p.sectorName;
+      if (!existing.themeName && p.themeName) existing.themeName = p.themeName;
       if (!existing.topdownName && p.topdownName) existing.topdownName = p.topdownName;
       if (!existing.gicIndustry && p.gicIndustry) existing.gicIndustry = p.gicIndustry;
       if (!existing.exchangeCountry && p.exchangeCountry) existing.exchangeCountry = p.exchangeCountry;
@@ -329,6 +331,7 @@ export function getPortfolioSummary() {
         pnl: p.pnl || 0,
         market: p.market || "",
         sectorName: p.sectorName || "",
+        themeName: p.themeName || "",
         topdownName: p.topdownName || "",
         gicIndustry: p.gicIndustry || "",
         exchangeCountry: p.exchangeCountry || "",
@@ -346,6 +349,7 @@ export function getPortfolioSummary() {
   const bySectorMap = new Map<string, SummaryByDimension>();
   const byIndustryMap = new Map<string, SummaryByDimension>();
   const byThemeMap = new Map<string, SummaryByDimension>();
+  const byTopdownMap = new Map<string, SummaryByDimension>();
   const byRiskCountryMap = new Map<string, SummaryByDimension>();
   const byGicIndustryMap = new Map<string, SummaryByDimension>();
   const byExchangeCountryMap = new Map<string, SummaryByDimension>();
@@ -378,7 +382,8 @@ export function getPortfolioSummary() {
     // Taxonomy Dimensions
     addToDim(bySectorMap, company.market || "其他");
     addToDim(byIndustryMap, company.sectorName || "其他");
-    addToDim(byThemeMap, company.topdownName || "Others");
+    addToDim(byThemeMap, company.themeName || "其他");
+    addToDim(byTopdownMap, company.topdownName || "其他");
 
     // Native Dimensions
     addToDim(byRiskCountryMap, company.market || "其他");
@@ -404,7 +409,8 @@ export function getPortfolioSummary() {
 
     addPnlToDim(bySectorMap, p.market || "其他");
     addPnlToDim(byIndustryMap, p.sectorName || "其他");
-    addPnlToDim(byThemeMap, p.topdownName || "Others");
+    addPnlToDim(byThemeMap, p.themeName || "其他");
+    addPnlToDim(byTopdownMap, p.topdownName || "其他");
     addPnlToDim(byRiskCountryMap, p.market || "其他");
     addPnlToDim(byGicIndustryMap, p.gicIndustry || "其他");
     addPnlToDim(byExchangeCountryMap, p.exchangeCountry || "其他");
@@ -423,6 +429,7 @@ export function getPortfolioSummary() {
     bySector: [...bySectorMap.values()].sort((a, b) => b.gmv - a.gmv),
     byIndustry: [...byIndustryMap.values()].sort((a, b) => b.gmv - a.gmv),
     byTheme: [...byThemeMap.values()].sort((a, b) => b.gmv - a.gmv),
+    byTopdown: [...byTopdownMap.values()].sort((a, b) => b.gmv - a.gmv),
     byRiskCountry: [...byRiskCountryMap.values()].sort((a, b) => b.gmv - a.gmv),
     byGicIndustry: [...byGicIndustryMap.values()].sort((a, b) => b.gmv - a.gmv),
     byExchangeCountry: [...byExchangeCountryMap.values()].sort((a, b) => b.gmv - a.gmv),
