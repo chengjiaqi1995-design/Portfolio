@@ -472,7 +472,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-6 gap-3">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-3">
         {statCards.map(card => (
           <Card key={card.label} className="py-3 card-accent-top">
             <CardContent className="px-4 py-0">
@@ -517,11 +517,11 @@ export default function DashboardPage() {
       )}
 
       {/* Main area: Charts (left) + Positions (right) */}
-      <div className="flex gap-3" style={{ minHeight: "calc(100vh - 200px)" }}>
+      <div className="flex flex-col md:flex-row gap-3" style={{ minHeight: "calc(100vh - 200px)" }}>
         {/* LEFT: Charts (compact) */}
-        <div className="w-[48%] flex-shrink-0 min-w-0 space-y-3">
+        <div className="w-full md:w-[48%] flex-shrink-0 min-w-0 space-y-3">
           {/* NET row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Card className="py-1.5">
               <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">Net Exposure</CardTitle></CardHeader>
               <CardContent className="px-1 py-0">
@@ -563,7 +563,7 @@ export default function DashboardPage() {
           </div>
 
           {/* GMV row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Card className="py-1.5">
               <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">Gross Exposure</CardTitle></CardHeader>
               <CardContent className="px-1 py-0">
@@ -605,7 +605,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Long/Short GMV Distribution row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Card className="py-1.5">
               <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">Long GMV Distribution</CardTitle></CardHeader>
               <CardContent className="px-1 py-0">
@@ -623,7 +623,7 @@ export default function DashboardPage() {
           </div>
 
           {/* PNL row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Card className="py-1.5">
               <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">PNL Breakdown</CardTitle></CardHeader>
               <CardContent className="px-1 py-0">
@@ -663,7 +663,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Scatter plots row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Card className="py-1.5">
               <CardHeader className="px-3 py-1"><CardTitle className="font-serif text-sm font-semibold">GMV vs PNL — All</CardTitle></CardHeader>
               <CardContent className="px-1 py-0">
@@ -687,7 +687,7 @@ export default function DashboardPage() {
 
         {/* RIGHT: Linked Positions Table */}
         <div className="flex-1 min-w-0">
-          <Card className="sticky top-0 flex flex-col py-1.5" style={{ height: "calc(100vh - 80px)" }}>
+          <Card className="md:sticky md:top-0 flex flex-col py-1.5 h-[500px] md:h-[calc(100vh-80px)]">
             {/* Compact header — same height as chart card titles */}
             <CardHeader className="px-3 py-1 flex-shrink-0">
               <div className="flex items-center justify-between">

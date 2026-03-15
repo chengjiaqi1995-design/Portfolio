@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Source_Sans_3, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/sidebar";
+import { Sidebar, MobileNav } from "@/components/layout/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -42,9 +42,10 @@ export default function RootLayout({
         <TooltipProvider>
           <div className="flex h-screen overflow-hidden">
             <Sidebar />
-            <main className="flex-1 overflow-y-auto p-6">
+            <main className="flex-1 overflow-y-auto p-3 pb-20 md:p-6 md:pb-6">
               {children}
             </main>
+            <MobileNav />
           </div>
           <Toaster />
         </TooltipProvider>

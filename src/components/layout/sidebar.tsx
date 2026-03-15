@@ -23,7 +23,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-screen w-56 flex-col border-r border-[var(--border)]">
+    <aside className="hidden md:flex h-screen w-56 flex-col border-r border-[var(--border)]">
       {/* Logo */}
       <div className="flex h-16 items-center px-5 border-b border-[var(--border)]">
         <h1 className="font-serif text-lg tracking-tight">
@@ -64,5 +64,35 @@ export function Sidebar() {
         <p className="small-caps text-[0.5625rem] text-[var(--muted-foreground)]/60">v1.0</p>
       </div>
     </aside>
+  );
+}
+
+export function MobileNav() {
+  const pathname = usePathname();
+
+  return (
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-[var(--border)] bg-[var(--background)] px-1 py-1 safe-bottom">
+      {navItems.map((item) => {
+        const isActive =
+          item.href === "/"
+            ? pathname === "/"
+            : pathname.startsWith(item.href);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex flex-col items-center gap-0.5 px-2 py-1.5 text-[10px] rounded-md transition-colors",
+              isActive
+                ? "text-[var(--accent)] font-medium"
+                : "text-[var(--muted-foreground)]"
+            )}
+          >
+            <item.icon className="h-5 w-5" />
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

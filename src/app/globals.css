@@ -188,3 +188,8 @@
   height: 1px;
   background: var(--border);
 }
+
+/* Safe area for iPhone bottom bar */
+.safe-bottom {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+}

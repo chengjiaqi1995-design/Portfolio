@@ -483,7 +483,8 @@ export default function PositionsPage() {
       );
     }
     return (
-      <Table>
+      <div className="overflow-x-auto">
+      <Table className="min-w-[700px]">
         <TableHeader>
           <TableRow>
             {([
@@ -626,6 +627,7 @@ export default function PositionsPage() {
           ))}
         </TableBody>
       </Table>
+      </div>
     );
   }
 
@@ -643,7 +645,7 @@ export default function PositionsPage() {
 
       {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
+        <div className="relative w-full md:flex-1 md:min-w-[200px] md:max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="搜索公司/代码..."
@@ -800,7 +802,7 @@ export default function PositionsPage() {
 
       {/* Edit Sheet — for L/S, Position Amount, and read-only details */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-[400px] sm:max-w-md overflow-y-auto">
+        <SheetContent side="right" className="w-full sm:w-[400px] sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
               {selectedPosition?.nameCn || selectedPosition?.nameEn}
