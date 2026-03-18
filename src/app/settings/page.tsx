@@ -581,6 +581,9 @@ export default function SettingsPage() {
                             : "sk-..."
                         }
                         type="password"
+                        name={`apikey-${provider.id}`}
+                        id={`apikey-${provider.id}`}
+                        autoComplete="off"
                         className="text-xs"
                       />
                     </div>
@@ -674,6 +677,9 @@ export default function SettingsPage() {
               onChange={(e) => setAiApiKey(e.target.value)}
               placeholder="sk-..."
               type="password"
+              name="legacy-api-key"
+              id="legacy-api-key"
+              autoComplete="off"
             />
           </div>
           <Button onClick={handleSaveAiSettings} disabled={savingAi}>

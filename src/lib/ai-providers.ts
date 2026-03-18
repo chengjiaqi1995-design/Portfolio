@@ -65,6 +65,11 @@ export function createProviderInstance(config: AIProviderConfig) {
         apiKey: config.apiKey,
         baseURL: config.baseUrl || "https://api.deepseek.com/v1",
       });
+    case "qwen":
+      return createOpenAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseUrl || "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      });
     default:
       throw new Error(`Unknown provider: ${config.id}`);
   }

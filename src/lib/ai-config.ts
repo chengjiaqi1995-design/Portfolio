@@ -58,4 +58,12 @@ export const PROVIDER_DEFINITIONS: {
     needsBaseUrl: true,
     defaultBaseUrl: "https://api.deepseek.com/v1",
   },
+  {
+    id: "qwen",
+    name: "通义千问 (Qwen)",
+    defaultModel: "qwen-plus",
+    models: ["qwen-turbo", "qwen-plus", "qwen-max", "qwen-long"],
+    needsBaseUrl: true,
+    defaultBaseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  },
 ];
