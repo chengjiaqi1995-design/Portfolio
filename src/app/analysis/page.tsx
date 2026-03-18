@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { experimental_useObject as useObject } from "ai/react";
+// AI analysis uses generateObject (non-streaming JSON) for reliability
 import {
   Card,
   CardContent,
@@ -32,7 +32,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { portfolioAnalysisSchema, positionAnalysisSchema } from "@/lib/ai-schemas";
 import type { PortfolioAnalysis, PositionAnalysis } from "@/lib/ai-schemas";
 import { PROVIDER_DEFINITIONS } from "@/lib/ai-config";
 import type { AIProvidersSettings } from "@/lib/ai-config";
@@ -632,74 +631,12 @@ export default function AnalysisPage() {
         throw new Error(errData.error || `请求失败: ${res.status}`);
       }
 
-      // Read the streaming response
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No response body");
+      const data = await res.json();
 
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        accumulated += decoder.decode(value, { stream: true });
-
-        // Parse the streamed object from the accumulated text
-        // Vercel AI SDK streamObject sends the partial JSON via text stream protocol
-        try {
-          // Extract the latest object from the stream
-          // The stream format sends lines like: 0:"..." for text deltas
-          // or structured data. We'll parse the accumulated result.
-          const lines = accumulated.split("\n").filter(Boolean);
-          let latestJson = "";
-          for (const line of lines) {
-            // Look for object type messages (type "o" in Vercel AI SDK protocol)
-            if (line.startsWith("0:")) {
-              // Text delta
-              latestJson += JSON.parse(line.slice(2));
-            }
-          }
-          if (latestJson) {
-            try {
-              const parsed = JSON.parse(latestJson);
-              if (mode === "portfolio") {
-                setPortfolioResult(parsed);
-              } else {
-                setPositionResult(parsed);
-              }
-            } catch {
-              // Partial JSON, try to parse what we can
-            }
-          }
-        } catch {
-          // Continue accumulating
-        }
-      }
-
-      // Final parse
-      const lines = accumulated.split("\n").filter(Boolean);
-      let finalJson = "";
-      for (const line of lines) {
-        if (line.startsWith("0:")) {
-          try {
-            finalJson += JSON.parse(line.slice(2));
-          } catch {
-            // skip malformed lines
-          }
-        }
-      }
-      if (finalJson) {
-        try {
-          const parsed = JSON.parse(finalJson);
-          if (mode === "portfolio") {
-            setPortfolioResult(parsed);
-          } else {
-            setPositionResult(parsed);
-          }
-        } catch {
-          // Already set from streaming
-        }
+      if (mode === "portfolio") {
+        setPortfolioResult(data);
+      } else {
+        setPositionResult(data);
       }
     } catch (e: any) {
       setError(e.message || "分析失败");

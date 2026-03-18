@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { streamObject } from "ai";
+import { generateObject } from "ai";
 import { getProviderAndModel } from "@/lib/ai-providers";
 import { portfolioAnalysisSchema, positionAnalysisSchema } from "@/lib/ai-schemas";
 import {
@@ -185,15 +185,17 @@ export async function POST(req: NextRequest) {
     if (mode === "portfolio") {
       const prompt = buildPortfolioPrompt(customPrompt);
 
-      const result = streamObject({
+      const { object } = await generateObject({
         model: modelInstance,
         schema: portfolioAnalysisSchema,
         prompt,
         temperature: 0.3,
-        ...(providerId === "deepseek" ? { mode: "json" as const } : {}),
+        ...(providerId === "deepseek" || providerId === "qwen"
+          ? { mode: "json" as const }
+          : {}),
       });
 
-      return result.toTextStreamResponse();
+      return NextResponse.json(object);
     } else if (mode === "position") {
       if (!positionId) {
         return NextResponse.json(
@@ -223,15 +225,17 @@ export async function POST(req: NextRequest) {
         customPrompt
       );
 
-      const result = streamObject({
+      const { object } = await generateObject({
         model: modelInstance,
         schema: positionAnalysisSchema,
         prompt,
         temperature: 0.3,
-        ...(providerId === "deepseek" ? { mode: "json" as const } : {}),
+        ...(providerId === "deepseek" || providerId === "qwen"
+          ? { mode: "json" as const }
+          : {}),
       });
 
-      return result.toTextStreamResponse();
+      return NextResponse.json(object);
     } else {
       return NextResponse.json(
         { error: "Invalid mode. Use 'portfolio' or 'position'." },
