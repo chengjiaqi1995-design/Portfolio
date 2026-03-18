@@ -9,12 +9,14 @@ import {
   ArrowLeftRight,
   Upload,
   Settings,
+  BrainCircuit,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/positions", label: "Positions", icon: List },
   { href: "/trade", label: "Trade", icon: ArrowLeftRight },
+  { href: "/analysis", label: "Analysis", icon: BrainCircuit },
   { href: "/import", label: "Import", icon: Upload },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

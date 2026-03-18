@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, queryAll, run } from "@/lib/db";
 
 export async function GET() {
-  const rows = queryAll<{ key: string, value: string }>("SELECT key, value FROM AppSettings WHERE key IN ('aum', 'ai_api_key', 'ai_model', 'ai_base_url')");
+  const rows = queryAll<{ key: string, value: string }>("SELECT key, value FROM AppSettings WHERE key IN ('aum', 'ai_api_key', 'ai_model', 'ai_base_url', 'ai_providers')");
 
   const settings: Record<string, any> = { aum: 10_000_000 };
 
   for (const r of rows) {
     if (r.key === 'aum') {
       settings.aum = parseFloat(r.value);
+    } else if (r.key === 'ai_providers') {
+      try {
+        settings.ai_providers = JSON.parse(r.value);
+      } catch {
+        settings.ai_providers = null;
+      }
     } else {
       settings[r.key] = r.value;
     }
@@ -43,17 +49,26 @@ export async function PUT(request: NextRequest) {
     if (typeof body.ai_base_url === "string") {
       updates.push({ key: 'ai_base_url', value: body.ai_base_url });
     }
+    if (body.ai_providers && typeof body.ai_providers === "object") {
+      updates.push({ key: 'ai_providers', value: JSON.stringify(body.ai_providers) });
+    }
 
     if (updates.length > 0) {
       saveMany(updates);
     }
 
     // Read back all
-    const rows = queryAll<{ key: string, value: string }>("SELECT key, value FROM AppSettings WHERE key IN ('aum', 'ai_api_key', 'ai_model', 'ai_base_url')");
+    const rows = queryAll<{ key: string, value: string }>("SELECT key, value FROM AppSettings WHERE key IN ('aum', 'ai_api_key', 'ai_model', 'ai_base_url', 'ai_providers')");
     const settings: Record<string, any> = { aum: 10_000_000 };
     for (const r of rows) {
       if (r.key === 'aum') {
         settings.aum = parseFloat(r.value);
+      } else if (r.key === 'ai_providers') {
+        try {
+          settings.ai_providers = JSON.parse(r.value);
+        } catch {
+          settings.ai_providers = null;
+        }
       } else {
         settings[r.key] = r.value;
       }

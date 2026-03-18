@@ -39,6 +39,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import {
   Loader2,
   Plus,
@@ -46,9 +47,13 @@ import {
   Trash2,
   GripVertical,
   ChevronRight,
+  BrainCircuit,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { TaxonomyItem } from "@/lib/types";
+import type { AIProviderConfig, AIProvidersSettings } from "@/lib/ai-config";
+import { PROVIDER_DEFINITIONS } from "@/lib/ai-config";
 
 interface NameMapping {
   id: number;
@@ -348,11 +353,26 @@ export default function SettingsPage() {
   const [nameMappings, setNameMappings] = useState<NameMapping[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // AI Settings
+  // AI Settings (legacy)
   const [aiBaseUrl, setAiBaseUrl] = useState("");
   const [aiModel, setAiModel] = useState("");
   const [aiApiKey, setAiApiKey] = useState("");
   const [savingAi, setSavingAi] = useState(false);
+
+  // AI Multi-provider Settings
+  const [aiProviders, setAiProviders] = useState<AIProvidersSettings>({
+    providers: PROVIDER_DEFINITIONS.map((d) => ({
+      id: d.id,
+      name: d.name,
+      apiKey: "",
+      enabled: false,
+      baseUrl: d.defaultBaseUrl,
+      defaultModel: d.defaultModel,
+    })),
+    selectedProviderId: "anthropic",
+    selectedModel: "claude-sonnet-4-20250514",
+  });
+  const [savingAiProviders, setSavingAiProviders] = useState(false);
 
   // Name mapping dialog
   const [mappingDialogOpen, setMappingDialogOpen] = useState(false);
@@ -379,6 +399,7 @@ export default function SettingsPage() {
       if (settings.ai_base_url) setAiBaseUrl(settings.ai_base_url);
       if (settings.ai_model) setAiModel(settings.ai_model);
       if (settings.ai_api_key) setAiApiKey(settings.ai_api_key);
+      if (settings.ai_providers) setAiProviders(settings.ai_providers);
     } catch {
       toast.error("加载设置失败");
     } finally {
@@ -488,12 +509,143 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">设置</h1>
 
-      {/* AI Settings */}
+      {/* AI Multi-Provider Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>AI 模型配置</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <BrainCircuit className="h-5 w-5" />
+            AI 模型配置
+          </CardTitle>
           <CardDescription>
-            配置用于“AI自动填表”功能的大语言模型 API (兼容 OpenAI 格式)
+            配置 AI 模型提供商的 API Key，用于仓位分析和自动填表功能
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {aiProviders.providers.map((provider, index) => {
+              const def = PROVIDER_DEFINITIONS.find((d) => d.id === provider.id);
+              return (
+                <Card
+                  key={provider.id}
+                  className={`relative ${
+                    provider.enabled && provider.apiKey
+                      ? "border-[var(--accent)]/30"
+                      : ""
+                  }`}
+                >
+                  <CardContent className="pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">
+                          {provider.name}
+                        </span>
+                        {provider.enabled && provider.apiKey && (
+                          <Check className="h-3.5 w-3.5 text-green-500" />
+                        )}
+                      </div>
+                      <Switch
+                        checked={provider.enabled}
+                        onCheckedChange={(checked) => {
+                          setAiProviders((prev) => {
+                            const updated = { ...prev };
+                            updated.providers = [...prev.providers];
+                            updated.providers[index] = {
+                              ...updated.providers[index],
+                              enabled: checked,
+                            };
+                            return updated;
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">API Key</Label>
+                      <Input
+                        value={provider.apiKey}
+                        onChange={(e) => {
+                          setAiProviders((prev) => {
+                            const updated = { ...prev };
+                            updated.providers = [...prev.providers];
+                            updated.providers[index] = {
+                              ...updated.providers[index],
+                              apiKey: e.target.value,
+                            };
+                            return updated;
+                          });
+                        }}
+                        placeholder={
+                          provider.id === "anthropic"
+                            ? "sk-ant-..."
+                            : provider.id === "google"
+                            ? "AIza..."
+                            : "sk-..."
+                        }
+                        type="password"
+                        className="text-xs"
+                      />
+                    </div>
+                    {def?.needsBaseUrl && (
+                      <div className="space-y-2">
+                        <Label className="text-xs">Base URL</Label>
+                        <Input
+                          value={provider.baseUrl || ""}
+                          onChange={(e) => {
+                            setAiProviders((prev) => {
+                              const updated = { ...prev };
+                              updated.providers = [...prev.providers];
+                              updated.providers[index] = {
+                                ...updated.providers[index],
+                                baseUrl: e.target.value,
+                              };
+                              return updated;
+                            });
+                          }}
+                          placeholder={def.defaultBaseUrl}
+                          className="text-xs"
+                        />
+                      </div>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      Models: {def?.models.join(", ")}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          <Button
+            onClick={async () => {
+              setSavingAiProviders(true);
+              try {
+                const res = await fetch("/api/settings", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ai_providers: aiProviders }),
+                });
+                if (!res.ok) throw new Error("Failed");
+                toast.success("AI 配置保存成功");
+              } catch {
+                toast.error("保存失败");
+              } finally {
+                setSavingAiProviders(false);
+              }
+            }}
+            disabled={savingAiProviders}
+          >
+            {savingAiProviders && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            保存 AI 配置
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Legacy AI Settings (for backward compatibility with fill/translate) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>AI 旧版配置 (OpenAI 兼容)</CardTitle>
+          <CardDescription>
+            用于"AI自动填表"和"名称翻译"功能 (兼容 OpenAI 格式)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
