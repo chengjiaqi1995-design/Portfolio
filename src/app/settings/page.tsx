@@ -370,7 +370,7 @@ export default function SettingsPage() {
       defaultModel: d.defaultModel,
     })),
     selectedProviderId: "anthropic",
-    selectedModel: "claude-sonnet-4-20250514",
+    selectedModel: "claude-sonnet-4-6-20260217",
   });
   const [savingAiProviders, setSavingAiProviders] = useState(false);
 
